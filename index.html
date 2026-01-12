@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestion des Stocks - Multi-Utilisateurs</title>
+    <title>Gestion des Stocks - ART'RISE</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* Styles identiques au fichier original */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #e3f2fd 50%, #e8eaf6 100%); min-height: 100vh; }
 
@@ -20,8 +20,8 @@
         .login-body { padding: 2.5rem; }
         .form-group { margin-bottom: 1.5rem; }
         .form-group label { display: block; color: #2c3e50; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem; }
-        .form-group input, .form-group select { width: 100%; padding: 0.9rem; border: 2px solid #ecf0f1; border-radius: 10px; font-size: 1rem; transition: border 0.3s; }
-        .form-group input:focus, .form-group select:focus { outline: none; border-color: #5c6bc0; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.9rem; border: 2px solid #ecf0f1; border-radius: 10px; font-size: 1rem; transition: border 0.3s; font-family: inherit; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #5c6bc0; }
         .btn-login { width: 100%; padding: 1rem; background: linear-gradient(135deg, #5c6bc0, #3f51b5); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.3s; }
         .btn-login:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(92,107,192,0.4); }
 
@@ -70,6 +70,8 @@
         .search-box input:focus { outline: none; border-color: #5c6bc0; }
 
         .table-container { background: white; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 2rem; }
+        .table-header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; border-bottom: 2px solid #ecf0f1; }
+        .table-header h3 { color: #2c3e50; font-size: 1.3rem; }
         table { width: 100%; border-collapse: collapse; }
         thead { background: linear-gradient(135deg, #5c6bc0, #3f51b5); color: white; }
         th { padding: 1rem 0.75rem; text-align: left; font-weight: 600; font-size: 0.85rem; white-space: nowrap; }
@@ -99,84 +101,41 @@
         .btn-cancel { background: white; color: #7f8c8d; border: 2px solid #ecf0f1; }
         .no-data { text-align: center; padding: 3rem; color: #95a5a6; }
         .no-data i { font-size: 3rem; margin-bottom: 1rem; opacity: 0.5; }
-        .full-width { grid-column: 1 / -1; }
-        .quantity-cell { font-size: 1.1rem; font-weight: bold; color: #5c6bc0; }
-        .info-banner { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 1rem; margin-bottom: 2rem; border-radius: 8px; }
-        .info-banner i { color: #2196f3; margin-right: 0.5rem; }
 
         .alert { padding: 1rem; margin: 1rem 0; border-radius: 8px; border-left: 4px solid; }
         .alert-danger { background: #ffebee; border-color: #f44336; color: #d32f2f; }
         .alert-warning { background: #fff3e0; border-color: #ff9800; color: #e65100; }
+        .alert-success { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; }
+        .alert-info { background: #e3f2fd; border-color: #2196f3; color: #1976d2; }
 
-        .report-buttons { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
-        .btn-sm { padding: 0.5rem 1rem; font-size: 0.85rem; }
+        .expense-category-badge { padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; display: inline-block; }
+        .category-achat { background: #e1bee7; color: #7b1fa2; }
+        .category-operation { background: #b2dfdb; color: #00796b; }
+        .category-maintenance { background: #ffccbc; color: #e64a19; }
+        .category-autre { background: #e0e0e0; color: #424242; }
 
-        .cash-fund-modal { max-width: 400px !important; }
-        .product-table-modal { max-width: 800px !important; }
-        .sell-btn { background: linear-gradient(135deg, #66bb6a, #43a047); color: white; padding: 0.25rem 0.75rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
-        .sell-btn:hover { transform: scale(1.05); }
+        .loading-spinner { display: none; text-align: center; padding: 2rem; }
+        .loading-spinner.active { display: block; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #5c6bc0; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .daily-report-table { font-size: 0.75rem; }
-        .daily-report-table th, .daily-report-table td { padding: 0.5rem; text-align: center; border: 1px solid #ddd; }
-        .daily-report-table th { background: linear-gradient(135deg, #5c6bc0, #3f51b5); color: white; }
+        .sync-status { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.85rem; }
+        .sync-status.synced { background: #e8f5e9; color: #2e7d32; }
+        .sync-status.syncing { background: #fff3e0; color: #e65100; }
+        .sync-status.error { background: #ffebee; color: #d32f2f; }
 
-        .server-dashboard { background: white; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); padding: 2rem; margin-bottom: 2rem; }
-        .server-welcome { text-align: center; margin-bottom: 2rem; }
-        .server-welcome h2 { color: #2c3e50; margin-bottom: 0.5rem; }
-        .server-welcome p { color: #7f8c8d; }
-
-        .quick-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-        .quick-action-card { background: linear-gradient(135deg, #f5f7fa, #e3f2fd); padding: 1.5rem; border-radius: 12px; text-align: center; cursor: pointer; transition: all 0.3s; }
-        .quick-action-card:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
-        .quick-action-card i { font-size: 2rem; margin-bottom: 0.5rem; color: #5c6bc0; }
-        .quick-action-card h4 { color: #2c3e50; margin-bottom: 0.25rem; }
-        .quick-action-card p { color: #7f8c8d; font-size: 0.85rem; }
-
-        .product-quantity-control { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+        .prod-card { background: #fff; border: 2px solid #ecf0f1; border-radius: 8px; padding: 0.5rem; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .prod-card:hover { border-color: #5c6bc0; transform: translateY(-2px); }
+        .prod-card.selected { border-color: #43a047; background: #e8f5e9; }
         .qty-btn { background: #5c6bc0; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 14px; cursor: pointer; }
-        .qty-input { width: 34px; text-align: center; border: 1px solid #cfd8dc; border-radius: 4px; margin: 0 0.25rem; font-size: 0.8rem; }
-
-        .receipt-modal { max-width: 400px !important; }
-        .receipt-content { font-family: 'Courier New', monospace; background: white; padding: 1.5rem; border-radius: 8px; }
-        .receipt-header { text-align: center; margin-bottom: 1rem; border-bottom: 2px dashed #ccc; padding-bottom: 1rem; }
-        .receipt-body { margin-bottom: 1rem; }
-        .receipt-item { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
-        .receipt-footer { border-top: 2px dashed #ccc; padding-top: 1rem; text-align: center; }
-
-        @media print {
-            body * { visibility: hidden; }
-            .receipt-content * { visibility: visible; }
-            .receipt-content { position: absolute; left: 0; top: 0; }
-        }
+        .qty-input { width: 34px; text-align: center; border: 1px solid #cfd8dc; border-radius: 4px; font-size: 0.8rem; }
 
         @media (max-width: 768px) {
             .header-content { flex-direction: column; align-items: flex-start; }
             .table-container { overflow-x: auto; }
             table { min-width: 1200px; }
             .stats-grid { grid-template-columns: 1fr 1fr; }
-            .report-buttons { flex-direction: column; }
-            .quick-actions { grid-template-columns: 1fr; }
         }
-
-        .cash-fund-display { background: linear-gradient(135deg, #26a69a, #00897b); color: white; }
-        .badge { background: #5c6bc0; color: #fff; padding: .25rem .5rem; border-radius: 12px; font-size: .7rem; margin-left: .5rem; }
-        .prod-card { background: #fff; border: 2px solid #ecf0f1; border-radius: 8px; padding: .5rem; text-align: center; cursor: pointer; transition: all .2s; position: relative; }
-        .prod-card:hover { border-color: #5c6bc0; transform: translateY(-2px); }
-        .prod-card.selected { border-color: #43a047; background: #e8f5e9; }
-        .prod-name { font-weight: 600; font-size: .8rem; }
-        .prod-price { font-size: .75rem; color: #7f8c8d; }
-        .qty-controls { display: flex; align-items: center; justify-content: center; margin-top: .4rem; }
-        .qty-btn { border: none; background: #5c6bc0; color: #fff; border-radius: 50%; width: 24px; height: 24px; font-size: 14px; cursor: pointer; }
-        .qty-input { width: 34px; text-align: center; border: 1px solid #cfd8dc; border-radius: 4px; margin: 0 .25rem; font-size: .8rem; }
-        .recap-item { display: flex; justify-content: space-between; padding: .25rem .5rem; font-size: .8rem; }
-        .recap-item span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
-        .stock-controls { display: flex; gap: 0.5rem; align-items: center; }
-        .stock-btn { padding: 0.25rem 0.5rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
-        .stock-in { background: #c8e6c9; color: #2e7d32; }
-        .stock-out { background: #ffebee; color: #d32f2f; }
-        .stock-view { background: #e3f2fd; color: #1976d2; }
-        .stock-low { color: #f44336; font-weight: bold; }
-        .stock-ok { color: #4caf50; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -186,9 +145,10 @@
             <div class="login-header">
                 <i class="fas fa-user-lock"></i>
                 <h1>Connexion</h1>
-                <p>Système de Gestion de Stock</p>
+                <p>Système de Gestion de Stock ART'RISE</p>
             </div>
             <div class="login-body">
+                <div id="connectionStatus"></div>
                 <form id="loginForm" onsubmit="login(event)">
                     <div class="form-group">
                         <label>Nom d'utilisateur</label>
@@ -206,9 +166,7 @@
                     <strong>Comptes de test :</strong><br>
                     Admin: admin / admin123<br>
                     Caissière: caisse / caisse123<br>
-                    Sandy: sandy / sandy123<br>
-                    Leslie: leslie / leslie123<br>
-                    Rosia: rosia / rosia123
+                    Sandy: sandy / sandy123
                 </div>
             </div>
         </div>
@@ -221,24 +179,24 @@
                 <div class="logo-section">
                     <div class="logo"><i class="fas fa-boxes"></i></div>
                     <div>
-                        <h1>Fiche de Gestion de Stock</h1>
-                        <p class="subtitle">Système de gestion complet avec suivi des paiements</p>
+                        <h1>ART'RISE - Gestion de Stock</h1>
+                        <p class="subtitle">Système avancé avec synchronisation cloud</p>
                     </div>
                 </div>
                 <div class="header-buttons">
+                    <div id="syncStatusDisplay" class="sync-status synced">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span>Synchronisé</span>
+                    </div>
                     <div class="user-badge" id="userBadge">
                         <i class="fas fa-user"></i>
                         <span id="currentUser"></span>
                     </div>
-                    <button class="btn btn-warning" onclick="openProductCatalog()" id="btnCatalog" style="display:none;"><i class="fas fa-list"></i> Catalogue Produits</button>
-                    <button class="btn btn-info" onclick="showReportMenu()" id="btnReport"><i class="fas fa-chart-bar"></i> Rapports</button>
-                    <button class="btn btn-success" onclick="exportToExcel()" id="btnExport"><i class="fas fa-download"></i> Exporter</button>
-                    <button class="btn btn-primary" onclick="openQuickSale()" id="btnProductTable"><i class="fas fa-table"></i> Nouvelle Vente</button>
-                    <button class="btn btn-primary" onclick="openAddModal()" id="btnAdd" style="display:none;"><i class="fas fa-plus"></i> Nouvelle Vente</button>
-                    <button class="btn btn-primary" onclick="openUserManagement()" id="btnUsers" style="display:none;"><i class="fas fa-users"></i> Gérer Utilisateurs</button>
-                    <button class="btn btn-success" onclick="openStockManagement()" id="btnStock" style="display:none;"><i class="fas fa-box"></i> Gérer Stock</button>
-                    <button class="btn btn-info" onclick="toggleServerStats()" id="btnServerStats" style="display:none;"><i class="fas fa-chart-pie"></i> Stats Serveuses</button>
-                    <button class="btn btn-danger" onclick="resetAllData()" id="btnReset" style="display:none;"><i class="fas fa-trash"></i> Tout Réinitialiser</button>
+                    <button class="btn btn-success" onclick="openQuickSale()" id="btnQuickSale"><i class="fas fa-shopping-cart"></i> Nouvelle Vente</button>
+                    <button class="btn btn-warning" onclick="openExpenseModal()" id="btnExpense"><i class="fas fa-file-invoice-dollar"></i> Dépense</button>
+                    <button class="btn btn-info" onclick="openStockManagement()" id="btnStock"><i class="fas fa-box"></i> Stock</button>
+                    <button class="btn btn-primary" onclick="generateReport()" id="btnReport"><i class="fas fa-chart-bar"></i> Rapport</button>
+                    <button class="btn btn-success" onclick="exportToExcel()" id="btnExport"><i class="fas fa-download"></i> Export</button>
                     <button class="btn btn-danger" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
                 </div>
             </div>
@@ -246,219 +204,106 @@
 
         <div class="container">
             <div id="alertsContainer"></div>
-            <div class="info-banner" id="infoBanner"></div>
-
-            <!-- SERVEUSE DASHBOARD -->
-            <div id="serverDashboard" class="server-dashboard" style="display:none;">
-                <div class="server-welcome">
-                    <h2><i class="fas fa-hand-sparkles"></i> Bonjour <span id="serverNameDisplay"></span>!</h2>
-                    <p>Prête pour une nouvelle journée de ventes ?</p>
-                </div>
-
-                <div class="quick-actions">
-                    <div class="quick-action-card" onclick="openQuickSale()">
-                        <i class="fas fa-shopping-cart"></i>
-                        <h4>Nouvelle Vente</h4>
-                        <p>Commencer une vente</p>
-                    </div>
-                    <div class="quick-action-card" onclick="showMySales()">
-                        <i class="fas fa-list-alt"></i>
-                        <h4>Mes Ventes</h4>
-                        <p>Voir mes ventes du jour</p>
-                    </div>
-                    <div class="quick-action-card" onclick="printLastReceipt()">
-                        <i class="fas fa-receipt"></i>
-                        <h4>Imprimer Reçu</h4>
-                        <p>Reçu de la dernière vente</p>
-                    </div>
-                    <div class="quick-action-card" onclick="showMyStats()">
-                        <i class="fas fa-chart-line"></i>
-                        <h4>Mes Statistiques</h4>
-                        <p>Performance du jour</p>
-                    </div>
-                </div>
-
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-info"><h3>Mes Ventes Aujourd'hui</h3><p id="myDailySales">0</p></div>
-                        <div class="stat-icon blue"><i class="fas fa-receipt"></i></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-info"><h3>Mon CA du Jour</h3><p id="myDailyRevenue">0 FCFA</p></div>
-                        <div class="stat-icon purple"><i class="fas fa-euro-sign"></i></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-info"><h3>Produits Vendus</h3><p id="myDailyItems">0</p></div>
-                        <div class="stat-icon green"><i class="fas fa-box"></i></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="report-buttons" id="reportButtons" style="display:none;">
-                <button class="btn btn-info btn-sm" onclick="showReport('daily')"><i class="fas fa-calendar-day"></i> Journalier</button>
-                <button class="btn btn-info btn-sm" onclick="showReport('weekly')"><i class="fas fa-calendar-week"></i> Hebdomadaire</button>
-                <button class="btn btn-info btn-sm" onclick="showReport('monthly')"><i class="fas fa-calendar-alt"></i> Mensuel</button>
-                <button class="btn btn-info btn-sm" onclick="showReport('quarterly')"><i class="fas fa-calendar-check"></i> Trimestriel</button>
-                <button class="btn btn-info btn-sm" onclick="showReport('yearly')"><i class="fas fa-calendar"></i> Annuel</button>
-            </div>
-
+            
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-info"><h3>Total Ventes</h3><p id="totalSales">0</p></div>
+                    <div class="stat-info"><h3>Ventes Aujourd'hui</h3><p id="todaySales">0</p></div>
                     <div class="stat-icon blue"><i class="fas fa-receipt"></i></div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-info"><h3>Montant Total</h3><p id="totalAmount">0 FCFA</p></div>
-                    <div class="stat-icon purple"><i class="fas fa-shopping-cart"></i></div>
+                    <div class="stat-info"><h3>CA du Jour</h3><p id="todayRevenue">0 FCFA</p></div>
+                    <div class="stat-icon purple"><i class="fas fa-euro-sign"></i></div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-info"><h3>Paiements OM</h3><p id="totalOM">0 FCFA</p></div>
-                    <div class="stat-icon orange"><i class="fas fa-mobile-alt"></i></div>
+                    <div class="stat-info"><h3>Dépenses du Jour</h3><p id="todayExpenses">0 FCFA</p></div>
+                    <div class="stat-icon red"><i class="fas fa-minus-circle"></i></div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-info"><h3>Paiements MOMO</h3><p id="totalMOMO">0 FCFA</p></div>
-                    <div class="stat-icon teal"><i class="fas fa-money-bill-wave"></i></div>
+                    <div class="stat-info"><h3>Résultat Net</h3><p id="netResult">0 FCFA</p></div>
+                    <div class="stat-icon green"><i class="fas fa-balance-scale"></i></div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-info"><h3>Paiements CASH</h3><p id="totalCASH">0 FCFA</p></div>
-                    <div class="stat-icon red"><i class="fas fa-coins"></i></div>
+                    <div class="stat-info"><h3>Stock Faible</h3><p id="lowStockCount">0</p></div>
+                    <div class="stat-icon orange"><i class="fas fa-exclamation-triangle"></i></div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-info"><h3>Articles Vendus</h3><p id="totalItems">0</p></div>
-                    <div class="stat-icon green"><i class="fas fa-box"></i></div>
-                </div>
-                <div class="stat-card cash-fund-display" id="cashFundCard" style="display:none;">
-                    <div class="stat-info"><h3>Fonds de Caisse</h3><p id="cashFundAmountDisplay">0 FCFA</p></div>
-                    <div class="stat-icon" style="background: rgba(255,255,255,0.2);"><i class="fas fa-money-bill-wave"></i></div>
+                    <div class="stat-info"><h3>Valeur Stock</h3><p id="stockValue">0 FCFA</p></div>
+                    <div class="stat-icon teal"><i class="fas fa-warehouse"></i></div>
                 </div>
             </div>
 
-            <!-- FICHE DE DÉPENSES -->
-            <div class="container" id="expenseSection" style="margin-top: 2rem;">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-info">
-                            <h3>Dépenses du Jour</h3>
-                            <p id="dailyExpenses">0 FCFA</p>
-                        </div>
-                        <div class="stat-icon red"><i class="fas fa-minus-circle"></i></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-info">
-                            <h3>Total Dépenses</h3>
-                            <p id="totalExpenses">0 FCFA</p>
-                        </div>
-                        <div class="stat-icon orange"><i class="fas fa-file-invoice-dollar"></i></div>
-                    </div>
-                </div>
-
-                <div class="table-container">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <h3>Fiche de Dépenses</h3>
-                        <button class="btn btn-success" onclick="openExpenseModal()">
-                            <i class="fas fa-plus"></i> Nouvelle Dépense
-                        </button>
-                    </div>
-                    <table id="expenseTable">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Libellé</th>
-                                <th>Référence</th>
-                                <th>Quantité</th>
-                                <th>Prix Unitaire</th>
-                                <th>Total</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="expenseTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- STATISTIQUES SERVEUSES -->
-            <div class="container" id="serverStatsSection" style="margin-top: 2rem; display: none;">
-                <h2>Statistiques des Serveuses</h2>
-                <div class="stats-grid" id="serverStatsGrid"></div>
-                <div class="table-container">
-                    <table id="serverPerformanceTable">
-                        <thead>
-                            <tr>
-                                <th>Serveuse</th>
-                                <th>Ventes</th>
-                                <th>Articles</th>
-                                <th>CA Total</th>
-                                <th>CA Moyen/Vente</th>
-                                <th>Performance</th>
-                            </tr>
-                        </thead>
-                        <tbody id="serverPerformanceBody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="search-section" id="searchSection">
+            <div class="search-section">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Rechercher par serveuse, produits..." oninput="filterSales()">
+                    <input type="text" id="searchInput" placeholder="Rechercher des ventes..." oninput="filterSales()">
                 </div>
             </div>
 
             <div class="table-container">
-                <table>
+                <div class="table-header">
+                    <h3><i class="fas fa-shopping-cart"></i> Historique des Ventes</h3>
+                </div>
+                <div class="loading-spinner" id="salesLoading">
+                    <div class="spinner"></div>
+                    <p>Chargement des données...</p>
+                </div>
+                <table id="salesTable">
                     <thead>
                         <tr>
                             <th>Date & Heure</th>
-                            <th>Serveuse/Vendeuse</th>
-                            <th style="text-align: center;">Qtés</th>
-                            <th style="text-align: right;">Prix Unit.</th>
-                            <th style="text-align: left;">Produits</th>
-                            <th style="text-align: center;">Stock</th>
-                            <th style="text-align: right;">Montant Total</th>
-                            <th style="text-align: center;">OM</th>
-                            <th style="text-align: center;">MOMO</th>
-                            <th style="text-align: center;">CASH</th>
+                            <th>Vendeur</th>
+                            <th>Produits</th>
+                            <th>Quantité</th>
+                            <th>Montant</th>
+                            <th>Paiement</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="salesTableBody"></tbody>
                 </table>
-                <div id="noData" class="no-data" style="display: none;">
-                    <i class="fas fa-box-open"></i>
-                    <p>Aucune vente trouvée</p>
+                <div id="noSalesData" class="no-data" style="display: none;">
+                    <i class="fas fa-shopping-cart"></i>
+                    <p>Aucune vente enregistrée</p>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- MODAL FONDS DE CAISSE -->
-    <div id="cashFundModal" class="modal">
-        <div class="modal-content cash-fund-modal">
-            <div class="modal-header">
-                <h2><i class="fas fa-money-bill-wave"></i> Fonds de Caisse OBLIGATOIRE</h2>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    Vous devez impérativement configurer le fonds de caisse avant toute action.
+            <div class="table-container">
+                <div class="table-header">
+                    <h3><i class="fas fa-file-invoice-dollar"></i> Fiche des Dépenses</h3>
                 </div>
-                <div class="form-group">
-                    <label>Montant du Fonds de Caisse (FCFA)</label>
-                    <input type="number" id="cashFundAmount" min="0" step="100" placeholder="Ex: 100000">
+                <div class="loading-spinner" id="expensesLoading">
+                    <div class="spinner"></div>
+                    <p>Chargement des dépenses...</p>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-success" onclick="saveCashFund()">
-                    <i class="fas fa-save"></i> Valider et continuer
-                </button>
+                <table id="expensesTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Catégorie</th>
+                            <th>Libellé</th>
+                            <th>Référence</th>
+                            <th>Quantité</th>
+                            <th>Prix Unit.</th>
+                            <th>Total</th>
+                            <th>Saisi par</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expensesTableBody"></tbody>
+                </table>
+                <div id="noExpensesData" class="no-data" style="display: none;">
+                    <i class="fas fa-file-invoice"></i>
+                    <p>Aucune dépense enregistrée</p>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- MODAL VENTE RAPIDE -->
     <div id="quickSaleModal" class="modal">
-        <div class="modal-content" style="max-width:900px;font-size:0.9rem">
+        <div class="modal-content" style="max-width:900px;">
             <div class="modal-header">
-                <h2><i class="fas fa-shopping-cart"></i> Vente Rapide</h2>
+                <h2><i class="fas fa-shopping-cart"></i> Nouvelle Vente</h2>
                 <button class="action-btn btn-delete" onclick="closeQuickSale()" style="background:rgba(255,255,255,.2);color:#fff">
                     <i class="fas fa-times"></i>
                 </button>
@@ -467,7 +312,7 @@
                 <div id="quickProductsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.75rem;margin-bottom:1rem;max-height:45vh;overflow-y:auto;"></div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
                     <div>
-                        <h4>Récapitulatif <span id="recapBadge" class="badge">0 article(s)</span></h4>
+                        <h4>Récapitulatif <span id="recapBadge" style="background:#5c6bc0;color:white;padding:.25rem .5rem;border-radius:12px;font-size:.7rem">0 article(s)</span></h4>
                         <div id="quickRecap" style="background:#f5f7fa;border-radius:6px;padding:0.5rem;max-height:120px;overflow-y:auto;"></div>
                     </div>
                     <div>
@@ -488,6 +333,62 @@
         </div>
     </div>
 
+    <!-- MODAL DÉPENSES -->
+    <div id="expenseModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-plus"></i> <span id="expenseModalTitle">Nouvelle Dépense</span></h2>
+                <button class="action-btn btn-delete" onclick="closeExpenseModal()" style="background: rgba(255,255,255,0.2); color: white;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Date *</label>
+                    <input type="date" id="expenseDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Catégorie *</label>
+                    <select id="expenseCategory" required>
+                        <option value="">-- Choisir une catégorie --</option>
+                        <option value="achat">Achat de stock</option>
+                        <option value="operation">Frais opérationnels</option>
+                        <option value="maintenance">Maintenance</option>
+                        <option value="autre">Autre</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Libellé *</label>
+                    <input type="text" id="expenseLibelle" placeholder="Ex: Achat de Kadji" required>
+                </div>
+                <div class="form-group">
+                    <label>Référence</label>
+                    <input type="text" id="expenseReference" placeholder="Ex: Facture #123">
+                </div>
+                <div class="form-group">
+                    <label>Quantité *</label>
+                    <input type="number" id="expenseQuantity" min="1" value="1" oninput="calculateExpenseTotal()" required>
+                </div>
+                <div class="form-group">
+                    <label>Prix Unitaire (FCFA) *</label>
+                    <input type="number" id="expenseUnitPrice" min="0" step="100" placeholder="Ex: 7800" oninput="calculateExpenseTotal()" required>
+                </div>
+                <div class="form-group">
+                    <label>Total (FCFA)</label>
+                    <input type="number" id="expenseTotal" readonly style="background: #e8f5e9; font-weight: bold; font-size: 1.2rem;">
+                </div>
+                <div class="form-group">
+                    <label>Commentaires</label>
+                    <textarea id="expenseNotes" rows="3" placeholder="Informations complémentaires..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" onclick="closeExpenseModal()">Annuler</button>
+                <button class="btn btn-success" onclick="saveExpense()"><i class="fas fa-save"></i> Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL GESTION DE STOCK -->
     <div id="stockModal" class="modal">
         <div class="modal-content" style="max-width: 95%;">
@@ -500,22 +401,26 @@
             <div class="modal-body">
                 <div style="margin-bottom: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
                     <button class="btn btn-success" onclick="openAddStockModal()"><i class="fas fa-plus"></i> Entrée de Stock</button>
-                    <button class="btn btn-warning" onclick="openStockReport()"><i class="fas fa-chart-bar"></i> Rapport Stock</button>
+                    <button class="btn btn-warning" onclick="syncStockData()"><i class="fas fa-sync"></i> Synchroniser</button>
                 </div>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Produit</th>
-                                <th style="text-align: center;">Stock Actuel</th>
-                                <th style="text-align: center;">Seuil d'Alerte</th>
-                                <th style="text-align: center;">Statut</th>
-                                <th style="text-align: center;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="stockTableBody"></tbody>
-                    </table>
+                <div class="loading-spinner" id="stockLoading">
+                    <div class="spinner"></div>
+                    <p>Chargement des stocks...</p>
                 </div>
+                <table id="stockTable">
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th>Stock Actuel</th>
+                            <th>Seuil d'Alerte</th>
+                            <th>Prix</th>
+                            <th>Valeur</th>
+                            <th>Statut</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockTableBody"></tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -531,17 +436,17 @@
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Produit</label>
-                    <select id="stockProduct" class="form-control">
+                    <label>Produit *</label>
+                    <select id="stockProduct" required>
                         <option value="">-- Choisir un produit --</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Quantité à ajouter</label>
-                    <input type="number" id="stockQuantity" min="1" value="1">
+                    <label>Quantité à ajouter *</label>
+                    <input type="number" id="stockQuantity" min="1" value="1" required>
                 </div>
                 <div class="form-group">
-                    <label>Référence (optionnel)</label>
+                    <label>Référence</label>
                     <input type="text" id="stockReference" placeholder="Ex: BE2024001">
                 </div>
                 <div class="form-group">
@@ -556,286 +461,46 @@
         </div>
     </div>
 
-    <!-- MODAL RAPPORT STOCK -->
-    <div id="stockReportModal" class="modal">
-        <div class="modal-content" style="max-width: 95%;">
-            <div class="modal-header">
-                <h2><i class="fas fa-chart-bar"></i> Rapport de Stock</h2>
-                <button class="action-btn btn-delete" onclick="closeStockReport()" style="background: rgba(255,255,255,0.2); color: white;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body" id="stockReportContent">
-                <!-- Le contenu sera généré dynamiquement -->
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL GESTION DES UTILISATEURS (ADMIN) -->
-    <div id="userManagementModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-users"></i> Gestion des Utilisateurs</h2>
-                <button class="action-btn btn-delete" onclick="closeUserManagementModal()" style="background: rgba(255,255,255,0.2); color: white;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 1.5rem;">
-                    <button class="btn btn-success" onclick="openAddUserModal()"><i class="fas fa-user-plus"></i> Nouvelle Serveuse</button>
-                </div>
-                <div id="usersList"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL CATALOGUE PRODUITS -->
-    <div id="catalogModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-list"></i> Catalogue des Produits</h2>
-                <button class="action-btn btn-delete" onclick="closeCatalogModal()" style="background: rgba(255,255,255,0.2); color: white;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 1.5rem;">
-                    <button class="btn btn-success" onclick="addNewProduct()"><i class="fas fa-plus"></i> Ajouter un Produit</button>
-                </div>
-                <div class="checkbox-group" id="catalogList"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL AJOUT UTILISATEUR -->
-    <div id="addUserModal" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h2>Ajouter une Serveuse</h2>
-                <button class="action-btn btn-delete" onclick="closeAddUserModal()" style="background: rgba(255,255,255,0.2); color: white;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Nom d'utilisateur *</label>
-                    <input type="text" id="newUsername" placeholder="Ex: marie">
-                </div>
-                <div class="form-group">
-                    <label>Nom complet *</label>
-                    <input type="text" id="newUserFullname" placeholder="Ex: Marie Dupont">
-                </div>
-                <div class="form-group">
-                    <label>Mot de passe *</label>
-                    <input type="password" id="newUserPassword" placeholder="Min. 6 caractères">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-cancel" onclick="closeAddUserModal()">Annuler</button>
-                <button class="btn btn-success" onclick="saveNewUser()"><i class="fas fa-save"></i> Enregistrer</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL MODIFICATION UTILISATEUR -->
-    <div id="editUserModal" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h2>Modifier Utilisateur</h2>
-                <button class="action-btn btn-delete" onclick="closeEditUserModal()" style="background: rgba(255,255,255,0.2); color: white;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Nom d'utilisateur</label>
-                    <input type="text" id="editUsername" readonly style="background: #f5f5f5;">
-                </div>
-                <div class="form-group">
-                    <label>Nom complet</label>
-                    <input type="text" id="editUserFullname" placeholder="Ex: Marie Dupont">
-                </div>
-                <div class="form-group">
-                    <label>Nouveau mot de passe (laisser vide pour conserver)</label>
-                    <input type="password" id="editUserPassword" placeholder="Min. 6 caractères">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-cancel" onclick="closeEditUserModal()">Annuler</button>
-                <button class="btn btn-success" onclick="updateUser()"><i class="fas fa-save"></i> Enregistrer</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL AJOUT PRODUIT -->
-    <div id="addProductModal" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h2>Ajouter un Produit</h2>
-                <button class="action-btn btn-delete" onclick="closeAddProductModal()" style="background: rgba(255,255,255,0.2); color: white;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Nom du Produit *</label>
-                    <input type="text" id="newProductName" placeholder="Ex: Kadji">
-                </div>
-                <div class="form-group">
-                    <label>Code du Produit *</label>
-                    <input type="text" id="newProductCode" placeholder="Ex: kadji">
-                </div>
-                <div class="form-group">
-                    <label>Prix (FCFA)</label>
-                    <input type="number" id="newProductPrice" min="0" step="100" placeholder="Ex: 1000">
-                </div>
-                <div class="form-group">
-                    <label>Stock Initial</label>
-                    <input type="number" id="newProductStock" min="0" value="0">
-                </div>
-                <div class="form-group">
-                    <label>Seuil d'alerte</label>
-                    <input type="number" id="newProductAlert" min="0" value="10">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-cancel" onclick="closeAddProductModal()">Annuler</button>
-                <button class="btn btn-success" onclick="saveNewProduct()"><i class="fas fa-save"></i> Enregistrer</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL RAPPORT JOURNALIER COMPLET -->
-    <div id="dailyReportModal" class="modal">
-        <div class="modal-content" style="max-width: 95%; max-height: 95vh;">
-            <div class="modal-header">
-                <h2><i class="fas fa-calendar-day"></i> Rapport Journalier Complet</h2>
-                <button class="action-btn btn-delete" onclick="closeDailyReportModal()" style="background: rgba(255,255,255,0.2); color: white;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body" id="dailyReportContent">
-                <!-- Le contenu sera généré dynamiquement -->
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-success" onclick="exportDailyReportToExcel()"><i class="fas fa-download"></i> Exporter le Rapport</button>
-                <button class="btn btn-cancel" onclick="closeDailyReportModal()">Fermer</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL IMPRESSION REÇU -->
-    <div id="receiptModal" class="modal receipt-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-receipt"></i> Reçu de Vente</h2>
-                <button class="action-btn btn-delete" onclick="closeReceiptModal()" style="background: rgba(255,255,255,0.2); color: white;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="receipt-content" id="receiptContent">
-                    <!-- Le contenu du reçu sera généré dynamiquement -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-success" onclick="printReceipt()"><i class="fas fa-print"></i> Imprimer</button>
-                <button class="btn btn-cancel" onclick="closeReceiptModal()">Fermer</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL AJOUT/MODIFICATION VENTE -->
-    <div id="saleModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle">Nouvelle Vente</h2>
-                <button class="action-btn btn-delete" onclick="closeSaleModal()" style="background: rgba(255,255,255,0.2); color: white;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Serveuse/Vendeuse *</label>
-                        <input type="text" id="serverName" placeholder="Votre nom" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Quantité Totale</label>
-                        <input type="number" id="saleQuantity" min="0" value="0" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Prix Total (FCFA)</label>
-                        <input type="number" id="saleTotal" min="0" step="100" value="0" readonly>
-                    </div>
-                    <div class="form-group full-width">
-                        <label>Produits Vendus (Sélectionnez la quantité)</label>
-                        <div id="productsQuantities"></div>
-                    </div>
-                    <div class="form-group">
-                        <label>Paiement OM (FCFA)</label>
-                        <input type="number" id="paymentOM" min="0" step="100" value="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Paiement MOMO (FCFA)</label>
-                        <input type="number" id="paymentMOMO" min="0" step="100" value="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Paiement CASH (FCFA)</label>
-                        <input type="number" id="paymentCASH" min="0" step="100" value="0">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-cancel" onclick="closeSaleModal()">Annuler</button>
-                <button class="btn btn-primary" onclick="saveSale()"><i class="fas fa-save"></i> Enregistrer</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL DÉPENSES -->
-    <div id="expenseModal" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h2><i class="fas fa-plus"></i> Nouvelle Dépense</h2>
-                <button class="action-btn btn-delete" onclick="closeExpenseModal()" style="background: rgba(255,255,255,0.2); color: white;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="expenseForm">
-                    <div class="form-group">
-                        <label>Date</label>
-                        <input type="text" id="expenseDate" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label>Libellé *</label>
-                        <input type="text" id="expenseLibelle" placeholder="Ex: Achat de Kadji" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Référence</label>
-                        <input type="text" id="expenseReference" placeholder="Ex: B22">
-                    </div>
-                    <div class="form-group">
-                        <label>Quantité</label>
-                        <input type="number" id="expenseQuantity" min="1" value="1">
-                    </div>
-                    <div class="form-group">
-                        <label>Prix Unitaire (FCFA)</label>
-                        <input type="number" id="expenseUnitPrice" min="0" step="100" placeholder="Ex: 7800">
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-cancel" onclick="closeExpenseModal()">Annuler</button>
-                <button class="btn btn-success" onclick="saveExpense()"><i class="fas fa-save"></i> Enregistrer</button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // ✅ Données des produits
-        var productCatalog = [
+        // Configuration Supabase
+        const SUPABASE_URL = 'https://plxgyjvqbfihxeikligr.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBseGd5anZxYmZpaHhlaWtsaWdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NTExNjksImV4cCI6MjA4MzUyNzE2OX0.SedBD4xHOJp3CSGrAmWlO_ye4TJtw25PPkWxmBkCEvA';
+        
+        // Variables globales
+        var supabaseClient = null;
+        var currentUser = null;
+        var sales = [];
+        var expenses = [];
+        var products = [];
+        var quickData = {};
+
+        // Initialisation Supabase
+        async function initSupabase() {
+            try {
+                if (!supabaseClient) {
+                    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                }
+                console.log('✅ Supabase initialisé');
+                showAlert('Connexion à la base de données établie', 'success');
+                return true;
+            } catch (error) {
+                console.error('❌ Erreur Supabase:', error);
+                showAlert('Erreur de connexion à la base de données', 'danger');
+                return false;
+            }
+        }
+
+        // Users
+        const users = {
+            admin: { password: 'admin123', role: 'admin', name: 'Administrateur' },
+            caisse: { password: 'caisse123', role: 'cashier', name: 'Caissière' },
+            sandy: { password: 'sandy123', role: 'server', name: 'Sandy' },
+            leslie: { password: 'leslie123', role: 'server', name: 'Leslie' },
+            rosia: { password: 'rosia123', role: 'server', name: 'Rosia' }
+        };
+
+        // Produits
+        const productCatalog = [
             {code: 'kadji', name: 'Kadji', price: 1000, stock: 50, alertThreshold: 10},
             {code: 'mutzig', name: 'Mutzig', price: 1200, stock: 50, alertThreshold: 10},
             {code: 'origin', name: 'Origin', price: 1500, stock: 50, alertThreshold: 10},
@@ -844,58 +509,26 @@
             {code: 'guinness_pm', name: 'Guinness PM', price: 1600, stock: 50, alertThreshold: 10},
             {code: 'ice_black', name: 'Ice Black', price: 1400, stock: 50, alertThreshold: 10},
             {code: 'beaufort', name: 'Beaufort', price: 2200, stock: 50, alertThreshold: 10},
-            {code: 'booster', name: 'Booster', price: 1100, stock: 50, alertThreshold: 10},
-            {code: 'harp', name: 'Harp', price: 1300, stock: 50, alertThreshold: 10},
-            {code: 'ice_pineapple', name: 'Ice Pineapple', price: 1500, stock: 50, alertThreshold: 10},
-            {code: 'smooth', name: 'Smooth', price: 1200, stock: 50, alertThreshold: 10},
-            {code: 'ucb_60cl', name: 'UCB 60cl', price: 900, stock: 50, alertThreshold: 10},
-            {code: 'palette_coca', name: 'Palette Coca', price: 1000, stock: 50, alertThreshold: 10},
-            {code: 'tangui', name: 'Tangui', price: 600, stock: 50, alertThreshold: 10},
-            {code: '33_exp', name: '33 EXP', price: 700, stock: 50, alertThreshold: 10},
-            {code: 'castel', name: 'Castel', price: 1600, stock: 50, alertThreshold: 10},
-            {code: 'djino', name: 'Djino', price: 800, stock: 50, alertThreshold: 10},
-            {code: 'jus_top', name: 'Jus Top', price: 500, stock: 50, alertThreshold: 10},
-            {code: 'isenbeck', name: 'Isenbeck', price: 1700, stock: 50, alertThreshold: 10},
-            {code: 'reactor', name: 'Reactor', price: 2000, stock: 50, alertThreshold: 10},
             {code: 'heineken', name: 'Heineken', price: 1800, stock: 50, alertThreshold: 10}
         ];
 
-        var users = {
-            admin: { password: 'admin123', role: 'admin', name: 'Administrateur' },
-            caisse: { password: 'caisse123', role: 'cashier', name: 'Caissière' },
-            sandy: { password: 'sandy123', role: 'server', name: 'Sandy' },
-            leslie: { password: 'leslie123', role: 'server', name: 'Leslie' },
-            rosia: { password: 'rosia123', role: 'server', name: 'Rosia' },
-            rhea: { password: 'rhea123', role: 'server', name: 'Rhea' },
-            linda: { password: 'linda123', role: 'server', name: 'Linda' },
-            fanelle: { password: 'fanelle123', role: 'server', name: 'Fanelle' },
-            glory: { password: 'glory123', role: 'server', name: 'Glory' }
-        };
-
-        var currentUser = null;
-        var sales = [];
-        var editingId = null;
-        var cashFund = 0;
-        var alerts = [];
-        var lastReceipt = null;
-        var productQuantities = {};
-        var selectedProductsForSale = [];
-        var stockMovements = [];
-        var expenses = [];
-
-        // 🔐 Connexion
-        function login(event) {
+        // Connexion
+        async function login(event) {
             event.preventDefault();
-            var username = document.getElementById('username').value.toLowerCase();
-            var password = document.getElementById('password').value;
+            const username = document.getElementById('username').value.toLowerCase();
+            const password = document.getElementById('password').value;
 
             if (users[username] && users[username].password === password) {
-                currentUser = { username: username, role: users[username].role, name: users[username].name };
+                currentUser = { 
+                    username: username, 
+                    role: users[username].role, 
+                    name: users[username].name 
+                };
                 document.getElementById('loginPage').style.display = 'none';
                 document.getElementById('appPage').classList.add('active');
-                initApp();
+                await initApp();
             } else {
-                alert('Identifiants incorrects !');
+                showAlert('Identifiants incorrects !', 'danger');
             }
         }
 
@@ -908,974 +541,250 @@
             }
         }
 
-        // 🧠 Initialisation
-        function initApp() {
+        // Initialisation
+        async function initApp() {
             document.getElementById('currentUser').textContent = currentUser.name;
-            document.getElementById('serverNameDisplay').textContent = currentUser.name;
-            var badge = document.getElementById('userBadge');
+            const badge = document.getElementById('userBadge');
             badge.className = 'user-badge role-' + currentUser.role;
 
-            // Vérifier la date du dernier fonds de caisse
-            var lastCashFundDate = localStorage.getItem('cashFundDate');
-            var today = getCurrentDate();
-
-            if (lastCashFundDate !== today) {
-                cashFund = 0;
-                localStorage.removeItem('cashFund');
-                localStorage.setItem('cashFundDate', today);
-            } else {
-                var savedCashFund = localStorage.getItem('cashFund');
-                if (savedCashFund) {
-                    cashFund = parseFloat(savedCashFund);
-                }
-            }
-
-            var savedSales = localStorage.getItem('sales');
-            if (savedSales) {
-                sales = JSON.parse(savedSales);
-            }
-
-            var savedStock = localStorage.getItem('productStock');
-            if (savedStock) {
-                var stockData = JSON.parse(savedStock);
-                productCatalog.forEach(function(prod) {
-                    if (stockData[prod.code]) {
-                        prod.stock = stockData[prod.code].stock;
-                        prod.alertThreshold = stockData[prod.code].alertThreshold;
-                    }
-                });
-            }
-
-            var savedMovements = localStorage.getItem('stockMovements');
-            if (savedMovements) {
-                stockMovements = JSON.parse(savedMovements);
-            }
-
-            // Affichage selon le rôle
-            if (currentUser.role === 'admin') {
-                document.getElementById('infoBanner').innerHTML = '<i class="fas fa-info-circle"></i> <strong>Mode Administrateur :</strong> Gestion complète du système.';
-                document.getElementById('btnCatalog').style.display = 'flex';
-                document.getElementById('btnAdd').style.display = 'none';
-                document.getElementById('btnProductTable').style.display = 'none';
-                document.getElementById('btnUsers').style.display = 'flex';
-                document.getElementById('btnReset').style.display = 'flex';
-                document.getElementById('btnStock').style.display = 'flex';
-                document.getElementById('btnServerStats').style.display = 'flex';
-                document.getElementById('cashFundCard').style.display = 'flex';
-                document.getElementById('searchSection').style.display = 'block';
-                document.getElementById('reportButtons').style.display = 'flex';
-                document.getElementById('serverDashboard').style.display = 'none';
-                document.getElementById('expenseSection').style.display = 'block';
-            } else if (currentUser.role === 'cashier') {
-                document.getElementById('infoBanner').innerHTML = '<i class="fas fa-info-circle"></i> <strong>Mode Caissière :</strong> Consultation des ventes et rapports.';
-                document.getElementById('btnCatalog').style.display = 'none';
-                document.getElementById('btnAdd').style.display = 'none';
-                document.getElementById('btnProductTable').style.display = 'none';
-                document.getElementById('btnUsers').style.display = 'none';
-                document.getElementById('btnReset').style.display = 'none';
-                document.getElementById('btnStock').style.display = 'flex';
-                document.getElementById('btnServerStats').style.display = 'none';
-                document.getElementById('cashFundCard').style.display = 'flex';
-                document.getElementById('searchSection').style.display = 'block';
-                document.getElementById('reportButtons').style.display = 'flex';
-                document.getElementById('serverDashboard').style.display = 'none';
-                document.getElementById('expenseSection').style.display = 'block';
-
-                if (!cashFund || cashFund === 0) {
-                    document.getElementById('cashFundModal').classList.add('active');
-                }
-            } else if (currentUser.role === 'server') {
-                document.getElementById('infoBanner').innerHTML = '<i class="fas fa-info-circle"></i> <strong>Mode Serveuse :</strong> Tableau de bord personnel.';
-                document.getElementById('btnCatalog').style.display = 'none';
-                document.getElementById('btnAdd').style.display = 'none';
-                document.getElementById('btnProductTable').style.display = 'flex';
-                document.getElementById('btnUsers').style.display = 'none';
-                document.getElementById('btnReset').style.display = 'none';
-                document.getElementById('btnStock').style.display = 'none';
-                document.getElementById('btnServerStats').style.display = 'none';
-                document.getElementById('cashFundCard').style.display = 'none';
-                document.getElementById('searchSection').style.display = 'none';
-                document.getElementById('reportButtons').style.display = 'none';
-                document.getElementById('serverDashboard').style.display = 'block';
-                document.getElementById('expenseSection').style.display = 'none';
-            }
-
-            loadExpenses();
-            updateCashFundDisplay();
-            renderSales();
+            products = [...productCatalog];
+            
+            // Charger les données
+            await loadSales();
+            await loadExpenses();
             updateStats();
-            if (currentUser.role === 'server') {
-                updateServerDashboard();
-            }
-            checkAlerts();
+            checkLowStock();
         }
 
-        // 💰 Fonds de caisse
-        function updateCashFundDisplay() {
-            document.getElementById('cashFundAmountDisplay').textContent = cashFund.toLocaleString('fr-FR') + ' FCFA';
-        }
+        // GESTION DES VENTES
+        async function loadSales() {
+            try {
+                document.getElementById('salesLoading').classList.add('active');
+                
+                const { data, error } = await supabaseClient
+                    .from('sales')
+                    .select('*')
+                    .order('created_at', { ascending: false });
 
-        function saveCashFund() {
-            var amount = parseFloat(document.getElementById('cashFundAmount').value);
-            if (amount && amount >= 0) {
-                cashFund = amount;
-                localStorage.setItem('cashFund', cashFund);
-                localStorage.setItem('cashFundDate', getCurrentDate());
-                updateCashFundDisplay();
-                document.getElementById('cashFundModal').classList.remove('active');
-                alert('Fonds de caisse enregistré : ' + cashFund.toLocaleString('fr-FR') + ' FCFA');
-            } else {
-                alert('Veuillez entrer un montant valide');
+                if (error) throw error;
+
+                sales = data || [];
+                renderSales();
+                document.getElementById('noSalesData').style.display = sales.length === 0 ? 'block' : 'none';
+            } catch (error) {
+                console.error('Erreur chargement ventes:', error);
+                showAlert('Erreur lors du chargement des ventes', 'danger');
+            } finally {
+                document.getElementById('salesLoading').classList.remove('active');
             }
         }
 
-        // 📊 Ventes
-        function renderSales(filteredSales) {
-            var tbody = document.getElementById('salesTableBody');
-            var noData = document.getElementById('noData');
-            var salesToRender = filteredSales || sales;
+        function renderSales() {
+            const tbody = document.getElementById('salesTableBody');
+            let html = '';
 
-            if (salesToRender.length === 0) {
-                tbody.innerHTML = '';
-                noData.style.display = 'block';
-                return;
-            }
+            sales.forEach(sale => {
+                const productsText = sale.products ? sale.products.join(', ') : '';
+                const paymentInfo = [];
+                if (sale.payment_om > 0) paymentInfo.push(`OM: ${sale.payment_om.toLocaleString()}`);
+                if (sale.payment_momo > 0) paymentInfo.push(`MOMO: ${sale.payment_momo.toLocaleString()}`);
+                if (sale.payment_cash > 0) paymentInfo.push(`CASH: ${sale.payment_cash.toLocaleString()}`);
 
-            noData.style.display = 'none';
-            var html = '';
-
-            for (var i = 0; i < salesToRender.length; i++) {
-                var sale = salesToRender[i];
-                var totalPayment = sale.paymentOM + sale.paymentMOMO + sale.paymentCASH;
-                var expectedAmount = sale.totalAmount || totalPayment;
-                var dateTime = sale.dateTime || (sale.date + ' ' + (sale.time || ''));
-
-                var productsText = sale.products.map(function(p) {
-                    var prod = productCatalog.find(function(pc) { return pc.code === p; });
-                    return prod ? prod.name : p;
-                }).join(', ');
-
-                html += '<tr>';
-                html += '<td>' + dateTime + '</td>';
-                html += '<td><strong>' + sale.serverName + '</strong></td>';
-                html += '<td style="text-align: center;"><span class="quantity-cell">' + sale.quantity + '</span></td>';
-                html += '<td style="text-align: right;">' + sale.unitPrice.toLocaleString('fr-FR') + ' FCFA</td>';
-                html += '<td style="text-align: left; font-size: 0.75rem; max-width: 180px; white-space: normal;">' + productsText + '</td>';
-                html += '<td style="text-align: center;">' + getStockStatus(sale.products) + '</td>';
-                html += '<td style="text-align: right;"><strong style="color: #5c6bc0;">' + expectedAmount.toLocaleString('fr-FR') + ' FCFA</strong></td>';
-                html += '<td style="text-align: center;">' + (sale.paymentOM > 0 ? '<span class="payment-badge payment-om">' + sale.paymentOM.toLocaleString('fr-FR') + '</span>' : '-') + '</td>';
-                html += '<td style="text-align: center;">' + (sale.paymentMOMO > 0 ? '<span class="payment-badge payment-momo">' + sale.paymentMOMO.toLocaleString('fr-FR') + '</span>' : '-') + '</td>';
-                html += '<td style="text-align: center;">' + (sale.paymentCASH > 0 ? '<span class="payment-badge payment-cash">' + sale.paymentCASH.toLocaleString('fr-FR') + '</span>' : '-') + '</td>';
-                html += '</tr>';
-            }
+                html += `
+                    <tr>
+                        <td>${formatDateTime(sale.created_at)}</td>
+                        <td><strong>${sale.server_name}</strong></td>
+                        <td style="font-size:0.75rem">${productsText}</td>
+                        <td style="text-align:center">${sale.quantity}</td>
+                        <td style="text-align:right"><strong>${sale.total_amount.toLocaleString()} FCFA</strong></td>
+                        <td style="font-size:0.75rem">${paymentInfo.join('<br>')}</td>
+                        <td style="text-align:center">
+                            <button class="action-btn btn-delete" onclick="deleteSale(${sale.id})" title="Supprimer">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
 
             tbody.innerHTML = html;
         }
 
-        function getStockStatus(products) {
-            var status = [];
-            var productCounts = {};
+        async function deleteSale(saleId) {
+            if (!confirm('Supprimer cette vente ?')) return;
 
-            products.forEach(function(p) {
-                productCounts[p] = (productCounts[p] || 0) + 1;
+            try {
+                const { error } = await supabaseClient
+                    .from('sales')
+                    .delete()
+                    .eq('id', saleId);
+
+                if (error) throw error;
+
+                showAlert('Vente supprimée avec succès', 'success');
+                await loadSales();
+                updateStats();
+            } catch (error) {
+                console.error('Erreur suppression:', error);
+                showAlert('Erreur lors de la suppression', 'danger');
+            }
+        }
+
+        // GESTION DES DÉPENSES
+        async function loadExpenses() {
+            try {
+                document.getElementById('expensesLoading').classList.add('active');
+                
+                const { data, error } = await supabaseClient
+                    .from('expenses')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                expenses = data || [];
+                renderExpenses();
+                document.getElementById('noExpensesData').style.display = expenses.length === 0 ? 'block' : 'none';
+            } catch (error) {
+                console.error('Erreur chargement dépenses:', error);
+                showAlert('Erreur lors du chargement des dépenses', 'danger');
+            } finally {
+                document.getElementById('expensesLoading').classList.remove('active');
+            }
+        }
+
+        function renderExpenses() {
+            const tbody = document.getElementById('expensesTableBody');
+            let html = '';
+
+            expenses.forEach(expense => {
+                const categoryBadge = getCategoryBadge(expense.category);
+                
+                html += `
+                    <tr>
+                        <td>${formatDate(expense.expense_date)}</td>
+                        <td>${categoryBadge}</td>
+                        <td><strong>${expense.libelle}</strong>${expense.notes ? '<br><small style="color:#7f8c8d">' + expense.notes + '</small>' : ''}</td>
+                        <td>${expense.reference || '-'}</td>
+                        <td style="text-align:center">${expense.quantity}</td>
+                        <td style="text-align:right">${expense.unit_price.toLocaleString()} FCFA</td>
+                        <td style="text-align:right"><strong>${expense.total.toLocaleString()} FCFA</strong></td>
+                        <td style="text-align:center"><small>${expense.user_name}</small></td>
+                        <td style="text-align:center">
+                            <button class="action-btn btn-delete" onclick="deleteExpense(${expense.id})" title="Supprimer">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
             });
-
-            for (var code in productCounts) {
-                var prod = productCatalog.find(function(pc) { return pc.code === code; });
-                if (prod) {
-                    if (prod.stock < productCounts[code]) {
-                        status.push('<span class="stock-low">' + prod.name + ': ' + prod.stock + '</span>');
-                    } else {
-                        status.push('<span class="stock-ok">' + prod.name + ': ' + prod.stock + '</span>');
-                    }
-                }
-            }
-
-            return status.join('<br>');
-        }
-
-        function updateStats() {
-            var totalSalesCount = sales.length;
-            var totalAmount = 0;
-            var totalOM = 0;
-            var totalMOMO = 0;
-            var totalCASH = 0;
-            var totalItems = 0;
-
-            for (var i = 0; i < sales.length; i++) {
-                var s = sales[i];
-                var amount = s.totalAmount || (s.paymentOM + s.paymentMOMO + s.paymentCASH);
-                totalAmount += amount;
-                totalOM += s.paymentOM;
-                totalMOMO += s.paymentMOMO;
-                totalCASH += s.paymentCASH;
-                totalItems += s.quantity;
-            }
-
-            document.getElementById('totalSales').textContent = totalSalesCount;
-            document.getElementById('totalAmount').textContent = totalAmount.toLocaleString('fr-FR') + ' FCFA';
-            document.getElementById('totalOM').textContent = totalOM.toLocaleString('fr-FR') + ' FCFA';
-            document.getElementById('totalMOMO').textContent = totalMOMO.toLocaleString('fr-FR') + ' FCFA';
-            document.getElementById('totalCASH').textContent = totalCASH.toLocaleString('fr-FR') + ' FCFA';
-            document.getElementById('totalItems').textContent = totalItems;
-        }
-
-        function updateServerDashboard() {
-            var today = getCurrentDate();
-            var mySalesToday = sales.filter(function(s) {
-                return s.serverUsername === currentUser.username && s.date === today;
-            });
-
-            var myRevenue = 0;
-            var myItems = 0;
-
-            for (var i = 0; i < mySalesToday.length; i++) {
-                myRevenue += (mySalesToday[i].totalAmount || (mySalesToday[i].paymentOM + mySalesToday[i].paymentMOMO + mySalesToday[i].paymentCASH));
-                myItems += mySalesToday[i].quantity;
-            }
-
-            document.getElementById('myDailySales').textContent = mySalesToday.length;
-            document.getElementById('myDailyRevenue').textContent = myRevenue.toLocaleString('fr-FR') + ' FCFA';
-            document.getElementById('myDailyItems').textContent = myItems;
-        }
-
-        function filterSales() {
-            var searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            var filtered = [];
-
-            for (var i = 0; i < sales.length; i++) {
-                var s = sales[i];
-                if (s.serverName.toLowerCase().indexOf(searchTerm) > -1) {
-                    filtered.push(s);
-                }
-            }
-
-            renderSales(filtered);
-        }
-
-        // 📅 Utilitaires
-        function getCurrentDate() {
-            var now = new Date();
-            var day = String(now.getDate()).padStart(2, '0');
-            var month = String(now.getMonth() + 1).padStart(2, '0');
-            var year = now.getFullYear();
-            return day + '/' + month + '/' + year;
-        }
-
-        function getCurrentTime() {
-            var now = new Date();
-            var hours = String(now.getHours()).padStart(2, '0');
-            var minutes = String(now.getMinutes()).padStart(2, '0');
-            return hours + ':' + minutes;
-        }
-
-        // 🧾 Rapports
-        function showReportMenu() {
-            document.getElementById('reportButtons').style.display = 'flex';
-        }
-
-        function showReport(type) {
-            if (type === 'daily') {
-                generateDailyReport();
-                return;
-            }
-
-            var reportData = generateReport(type);
-            var reportTitle = getReportTitle(type);
-
-            var html = '<div class="daily-report-container" style="width: 100%;">';
-            html += '<h3 style="background: linear-gradient(135deg, #5c6bc0, #3f51b5); color: white; padding: 1rem; margin: 0; text-align: center; width: 100%;">Rapport ' + reportTitle + '</h3>';
-            html += '<div style="margin: 1rem;"><strong>Période: </strong>' + reportData.period + '</div>';
-
-            var reportSales = getReportSales(type);
-            var vendeuses = {};
-            for (var i = 0; i < reportSales.length; i++) {
-                var sale = reportSales[i];
-                if (!vendeuses[sale.serverName]) {
-                    vendeuses[sale.serverName] = {
-                        sales: 0,
-                        totalQte: 0,
-                        totalMontant: 0,
-                        om: 0,
-                        momo: 0,
-                        cash: 0
-                    };
-                }
-                vendeuses[sale.serverName].sales++;
-                vendeuses[sale.serverName].totalQte += sale.quantity;
-                vendeuses[sale.serverName].totalMontant += (sale.totalAmount || (sale.paymentOM + sale.paymentMOMO + sale.paymentCASH));
-                vendeuses[sale.serverName].om += sale.paymentOM;
-                vendeuses[sale.serverName].momo += sale.paymentMOMO;
-                vendeuses[sale.serverName].cash += sale.paymentCASH;
-            }
-
-            html += '<table class="daily-report-table" style="width: 100%; margin: 1rem; border-collapse: collapse;">';
-            html += '<thead><tr style="background: linear-gradient(135deg, #5c6bc0, #3f51b5); color: white;">';
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">Vendeuse</th>';
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">Nombre de Ventes</th>';
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">Total Qté</th>';
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">Total Montant</th>';
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">OM</th>';
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">MOMO</th>';
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">CASH</th>';
-            html += '</tr></thead>';
-            html += '<tbody>';
-
-            for (var vendeuse in vendeuses) {
-                var data = vendeuses[vendeuse];
-                html += '<tr>';
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd;"><strong>' + vendeuse + '</strong></td>';
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center;">' + data.sales + '</td>';
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center;">' + data.totalQte + '</td>';
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: right;"><strong>' + data.totalMontant.toLocaleString('fr-FR') + '</strong></td>';
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: right;">' + data.om.toLocaleString('fr-FR') + '</td>';
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: right;">' + data.momo.toLocaleString('fr-FR') + '</td>';
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: right;">' + data.cash.toLocaleString('fr-FR') + '</td>';
-                html += '</tr>';
-            }
-
-            html += '</tbody></table>';
-
-            html += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1rem;">';
-            html += '<div class="stat-card"><div class="stat-info"><h3>Total Ventes</h3><p>' + reportData.totalSales + '</p></div></div>';
-            html += '<div class="stat-card"><div class="stat-info"><h3>Total Montant</h3><p>' + reportData.totalAmount.toLocaleString('fr-FR') + ' FCFA</p></div></div>';
-            html += '<div class="stat-card"><div class="stat-info"><h3>Total OM</h3><p>' + reportData.totalOM.toLocaleString('fr-FR') + ' FCFA</p></div></div>';
-            html += '<div class="stat-card"><div class="stat-info"><h3>Total MOMO</h3><p>' + reportData.totalMOMO.toLocaleString('fr-FR') + ' FCFA</p></div></div>';
-            html += '</div>';
-            html += '</div>';
-
-            var modal = document.createElement('div');
-            modal.className = 'modal active';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 95%; max-height: 95vh;">
-                    <div class="modal-header">
-                        <h2><i class="fas fa-chart-bar"></i> Rapport ${reportTitle}</h2>
-                        <button class="action-btn btn-delete" onclick="this.closest('.modal').remove()" style="background: rgba(255,255,255,0.2); color: white;">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="modal-body" style="overflow-y: auto;">
-                        ${html}
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-success" onclick="exportReportToExcel('${type}')">
-                            <i class="fas fa-download"></i> Exporter en Excel
-                        </button>
-                        <button class="btn btn-success" onclick="window.print()">
-                            <i class="fas fa-print"></i> Imprimer
-                        </button>
-                        <button class="btn btn-cancel" onclick="this.closest('.modal').remove()">Fermer</button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-        }
-
-        function generateDailyReport() {
-            var today = getCurrentDate();
-            var dailySales = [];
-
-            for (var i = 0; i < sales.length; i++) {
-                if (sales[i].date === today) {
-                    dailySales.push(sales[i]);
-                }
-            }
-
-            var html = '<div class="daily-report-container" style="width: 100%;">';
-            html += '<h3 style="background: linear-gradient(135deg, #5c6bc0, #3f51b5); color: white; padding: 1rem; margin: 0; text-align: center; width: 100%;">Rapport Journalier - ' + today + '</h3>';
-            html += '<div style="margin: 1rem; display: flex; justify-content: space-between;">';
-            html += '<div><strong>Total Ventes: </strong>' + dailySales.length + '</div>';
-            html += '<div><strong>Fonds de Caisse: </strong>' + cashFund.toLocaleString('fr-FR') + ' FCFA</div>';
-            html += '<div><strong>Date: </strong>' + today + '</div>';
-            html += '</div>';
-
-            html += '<table class="daily-report-table" style="width: 100%; margin: 1rem; border-collapse: collapse;">';
-            html += '<thead><tr style="background: linear-gradient(135deg, #5c6bc0, #3f51b5); color: white;">';
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">Vendeuse</th>';
-
-            for (var j = 0; j < productCatalog.length; j++) {
-                html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">' + productCatalog[j].name + '</th>';
-            }
-
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">Total Qté</th>';
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">Total Montant</th>';
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">OM</th>';
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">MOMO</th>';
-            html += '<th style="padding: 0.5rem; border: 1px solid #ddd;">CASH</th>';
-            html += '</tr></thead>';
-            html += '<tbody>';
-
-            var vendeuses = {};
-            for (var k = 0; k < dailySales.length; k++) {
-                var sale = dailySales[k];
-                if (!vendeuses[sale.serverName]) {
-                    vendeuses[sale.serverName] = {
-                        products: {},
-                        totalQte: 0,
-                        totalMontant: 0,
-                        om: 0,
-                        momo: 0,
-                        cash: 0
-                    };
-                }
-
-                for (var l = 0; l < sale.products.length; l++) {
-                    var prodCode = sale.products[l];
-                    if (!vendeuses[sale.serverName].products[prodCode]) {
-                        vendeuses[sale.serverName].products[prodCode] = 0;
-                    }
-                    vendeuses[sale.serverName].products[prodCode]++;
-                }
-
-                vendeuses[sale.serverName].totalQte += sale.quantity;
-                vendeuses[sale.serverName].totalMontant += (sale.totalAmount || (sale.paymentOM + sale.paymentMOMO + sale.paymentCASH));
-                vendeuses[sale.serverName].om += sale.paymentOM;
-                vendeuses[sale.serverName].momo += sale.paymentMOMO;
-                vendeuses[sale.serverName].cash += sale.paymentCASH;
-            }
-
-            for (var vendeuse in vendeuses) {
-                var data = vendeuses[vendeuse];
-                html += '<tr>';
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd;"><strong>' + vendeuse + '</strong></td>';
-
-                for (var m = 0; m < productCatalog.length; m++) {
-                    var prodCode = productCatalog[m].code;
-                    var qty = data.products[prodCode] || 0;
-                    html += '<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center;">' + (qty > 0 ? qty : '') + '</td>';
-                }
-
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: center;"><strong>' + data.totalQte + '</strong></td>';
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: right;"><strong>' + data.totalMontant.toLocaleString('fr-FR') + '</strong></td>';
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: right;">' + data.om.toLocaleString('fr-FR') + '</td>';
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: right;">' + data.momo.toLocaleString('fr-FR') + '</td>';
-                html += '<td style="padding: 0.5rem; border: 1px solid #ddd; text-align: right;">' + data.cash.toLocaleString('fr-FR') + '</td>';
-                html += '</tr>';
-            }
-
-            html += '</tbody></table>';
-
-            var totalGeneral = 0, totalOM = 0, totalMOMO = 0, totalCASH = 0;
-            for (var n = 0; n < dailySales.length; n++) {
-                var s = dailySales[n];
-                totalGeneral += (s.totalAmount || (s.paymentOM + s.paymentMOMO + s.paymentCASH));
-                totalOM += s.paymentOM;
-                totalMOMO += s.paymentMOMO;
-                totalCASH += s.paymentCASH;
-            }
-
-            html += '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1rem;">';
-            html += '<div class="stat-card"><div class="stat-info"><h3>Total Général</h3><p>' + totalGeneral.toLocaleString('fr-FR') + ' FCFA</p></div></div>';
-            html += '<div class="stat-card"><div class="stat-info"><h3>Total OM</h3><p>' + totalOM.toLocaleString('fr-FR') + ' FCFA</p></div></div>';
-            html += '<div class="stat-card"><div class="stat-info"><h3>Total MOMO</h3><p>' + totalMOMO.toLocaleString('fr-FR') + ' FCFA</p></div></div>';
-            html += '<div class="stat-card"><div class="stat-info"><h3>Total CASH</h3><p>' + totalCASH.toLocaleString('fr-FR') + ' FCFA</p></div></div>';
-            html += '</div>';
-            html += '</div>';
-
-            document.getElementById('dailyReportContent').innerHTML = html;
-            document.getElementById('dailyReportModal').classList.add('active');
-        }
-
-        function closeDailyReportModal() {
-            document.getElementById('dailyReportModal').classList.remove('active');
-        }
-
-        function exportDailyReportToExcel() {
-            var today = getCurrentDate();
-            var dailySales = [];
-
-            for (var i = 0; i < sales.length; i++) {
-                if (sales[i].date === today) {
-                    dailySales.push(sales[i]);
-                }
-            }
-
-            var data = [];
-
-            var headers = ['Date', 'Vendeuse', 'Heure'];
-            for (var j = 0; j < productCatalog.length; j++) {
-                headers.push(productCatalog[j].name);
-            }
-            headers.push('Total Qté', 'Total Montant', 'OM', 'MOMO', 'CASH');
-
-            var vendeuses = {};
-            for (var k = 0; k < dailySales.length; k++) {
-                var sale = dailySales[k];
-                var key = sale.serverName + '_' + sale.time;
-                if (!vendeuses[key]) {
-                    vendeuses[key] = {
-                        date: sale.date,
-                        time: sale.time,
-                        vendeuse: sale.serverName,
-                        products: {},
-                        totalQte: 0,
-                        totalMontant: 0,
-                        om: 0,
-                        momo: 0,
-                        cash: 0
-                    };
-                }
-
-                for (var l = 0; l < sale.products.length; l++) {
-                    var prodCode = sale.products[l];
-                    if (!vendeuses[key].products[prodCode]) {
-                        vendeuses[key].products[prodCode] = 0;
-                    }
-                    vendeuses[key].products[prodCode]++;
-                }
-
-                vendeuses[key].totalQte += sale.quantity;
-                vendeuses[key].totalMontant += (sale.totalAmount || (sale.paymentOM + sale.paymentMOMO + sale.paymentCASH));
-                vendeuses[key].om += sale.paymentOM;
-                vendeuses[key].momo += sale.paymentMOMO;
-                vendeuses[key].cash += sale.paymentCASH;
-            }
-
-            for (var key in vendeuses) {
-                var row = {};
-                var data = vendeuses[key];
-
-                row['Date'] = data.date;
-                row['Vendeuse'] = data.vendeuse;
-                row['Heure'] = data.time;
-
-                for (var m = 0; m < productCatalog.length; m++) {
-                    var prodCode = productCatalog[m].code;
-                    var prodName = productCatalog[m].name;
-                    row[prodName] = data.products[prodCode] || 0;
-                }
-
-                row['Total Qté'] = data.totalQte;
-                row['Total Montant'] = data.totalMontant;
-                row['OM'] = data.om;
-                row['MOMO'] = data.momo;
-                row['CASH'] = data.cash;
-
-                data.push(row);
-            }
-
-            var totalRow = {
-                'Date': 'TOTAL',
-                'Vendeuse': '',
-                'Heure': ''
-            };
-
-            var totalGeneral = 0, totalOM = 0, totalMOMO = 0, totalCASH = 0;
-            for (var n = 0; n < dailySales.length; n++) {
-                var s = dailySales[n];
-                totalGeneral += (s.totalAmount || (s.paymentOM + s.paymentMOMO + s.paymentCASH));
-                totalOM += s.paymentOM;
-                totalMOMO += s.paymentMOMO;
-                totalCASH += s.paymentCASH;
-            }
-
-            totalRow['Total Qté'] = dailySales.reduce((sum, sale) => sum + sale.quantity, 0);
-            totalRow['Total Montant'] = totalGeneral;
-            totalRow['OM'] = totalOM;
-            totalRow['MOMO'] = totalMOMO;
-            totalRow['CASH'] = totalCASH;
-            data.push(totalRow);
-
-            var ws = XLSX.utils.json_to_sheet(data);
-            var wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Rapport Journalier ' + today);
-
-            ws['!pageSetup'] = {
-                paperSize: 9,
-                orientation: 'landscape',
-                fitToWidth: 1,
-                fitToHeight: 0
-            };
-
-            var filename = 'rapport_journalier_' + today.replace(/\//g, '-') + '.xlsx';
-            XLSX.writeFile(wb, filename);
-
-            if (confirm('Voulez-vous aussi imprimer ce rapport en PDF ?')) {
-                window.print();
-            }
-        }
-
-        function generateReport(type) {
-            var now = new Date();
-            var reportSales = [];
-            var period = '';
-
-            if (type === 'weekly') {
-                var weekStart = new Date(now);
-                weekStart.setDate(now.getDate() - now.getDay());
-                var weekEnd = new Date(weekStart);
-                weekEnd.setDate(weekStart.getDate() + 6);
-                period = 'Semaine du ' + weekStart.toLocaleDateString('fr-FR') + ' au ' + weekEnd.toLocaleDateString('fr-FR');
-
-                for (var i = 0; i < sales.length; i++) {
-                    var saleDate = new Date(sales[i].date.split('/').reverse().join('-'));
-                    if (saleDate >= weekStart && saleDate <= weekEnd) {
-                        reportSales.push(sales[i]);
-                    }
-                }
-            } else if (type === 'monthly') {
-                var month = now.getMonth() + 1;
-                var year = now.getFullYear();
-                period = 'Mois de ' + getMonthName(month) + ' ' + year;
-
-                for (var i = 0; i < sales.length; i++) {
-                    var saleDate = new Date(sales[i].date.split('/').reverse().join('-'));
-                    if (saleDate.getMonth() + 1 === month && saleDate.getFullYear() === year) {
-                        reportSales.push(sales[i]);
-                    }
-                }
-            } else if (type === 'quarterly') {
-                var quarter = Math.floor(now.getMonth() / 3) + 1;
-                var year = now.getFullYear();
-                period = 'Trimestre ' + quarter + ' ' + year;
-
-                for (var i = 0; i < sales.length; i++) {
-                    var saleDate = new Date(sales[i].date.split('/').reverse().join('-'));
-                    var saleQuarter = Math.floor(saleDate.getMonth() / 3) + 1;
-                    if (saleQuarter === quarter && saleDate.getFullYear() === year) {
-                        reportSales.push(sales[i]);
-                    }
-                }
-            } else if (type === 'yearly') {
-                var year = now.getFullYear();
-                period = 'Année ' + year;
-
-                for (var i = 0; i < sales.length; i++) {
-                    var saleDate = new Date(sales[i].date.split('/').reverse().join('-'));
-                    if (saleDate.getFullYear() === year) {
-                        reportSales.push(sales[i]);
-                    }
-                }
-            }
-
-            var totalSales = reportSales.length;
-            var totalAmount = 0;
-            var totalOM = 0;
-            var totalMOMO = 0;
-            var totalCASH = 0;
-
-            for (var j = 0; j < reportSales.length; j++) {
-                var s = reportSales[j];
-                var amount = s.totalAmount || (s.paymentOM + s.paymentMOMO + s.paymentCASH);
-                totalAmount += amount;
-                totalOM += s.paymentOM;
-                totalMOMO += s.paymentMOMO;
-                totalCASH += s.paymentCASH;
-            }
-
-            return {
-                totalSales: totalSales,
-                totalAmount: totalAmount,
-                totalOM: totalOM,
-                totalMOMO: totalMOMO,
-                totalCASH: totalCASH,
-                period: period
-            };
-        }
-
-        function getReportTitle(type) {
-            var titles = {
-                'daily': 'Journalier',
-                'weekly': 'Hebdomadaire',
-                'monthly': 'Mensuel',
-                'quarterly': 'Trimestriel',
-                'yearly': 'Annuel'
-            };
-            return titles[type] || 'Inconnu';
-        }
-
-        function getMonthName(month) {
-            var months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-            return months[month - 1];
-        }
-
-        function getReportSales(type) {
-            var now = new Date();
-            var reportSales = [];
-
-            if (type === 'weekly') {
-                var weekStart = new Date(now);
-                weekStart.setDate(now.getDate() - now.getDay());
-                var weekEnd = new Date(weekStart);
-                weekEnd.setDate(weekStart.getDate() + 6);
-
-                for (var i = 0; i < sales.length; i++) {
-                    var saleDate = new Date(sales[i].date.split('/').reverse().join('-'));
-                    if (saleDate >= weekStart && saleDate <= weekEnd) {
-                        reportSales.push(sales[i]);
-                    }
-                }
-            } else if (type === 'monthly') {
-                var month = now.getMonth() + 1;
-                var year = now.getFullYear();
-
-                for (var i = 0; i < sales.length; i++) {
-                    var saleDate = new Date(sales[i].date.split('/').reverse().join('-'));
-                    if (saleDate.getMonth() + 1 === month && saleDate.getFullYear() === year) {
-                        reportSales.push(sales[i]);
-                    }
-                }
-            } else if (type === 'quarterly') {
-                var quarter = Math.floor(now.getMonth() / 3) + 1;
-                var year = now.getFullYear();
-
-                for (var i = 0; i < sales.length; i++) {
-                    var saleDate = new Date(sales[i].date.split('/').reverse().join('-'));
-                    var saleQuarter = Math.floor(saleDate.getMonth() / 3) + 1;
-                    if (saleQuarter === quarter && saleDate.getFullYear() === year) {
-                        reportSales.push(sales[i]);
-                    }
-                }
-            } else if (type === 'yearly') {
-                var year = now.getFullYear();
-
-                for (var i = 0; i < sales.length; i++) {
-                    var saleDate = new Date(sales[i].date.split('/').reverse().join('-'));
-                    if (saleDate.getFullYear() === year) {
-                        reportSales.push(sales[i]);
-                    }
-                }
-            }
-
-            return reportSales;
-        }
-
-        // 📦 Stock
-        function openStockManagement() {
-            renderStockTable();
-            document.getElementById('stockModal').classList.add('active');
-        }
-
-        function closeStockModal() {
-            document.getElementById('stockModal').classList.remove('active');
-        }
-
-        function renderStockTable() {
-            var tbody = document.getElementById('stockTableBody');
-            var html = '';
-
-            for (var i = 0; i < productCatalog.length; i++) {
-                var prod = productCatalog[i];
-                var statusClass = prod.stock <= prod.alertThreshold ? 'stock-low' : 'stock-ok';
-                var statusText = prod.stock <= prod.alertThreshold ? 'Stock faible' : 'OK';
-
-                html += '<tr>';
-                html += '<td><strong>' + prod.name + '</strong><br><small style="color: #7f8c8d;">' + prod.code + '</small></td>';
-                html += '<td style="text-align: center;"><span class="' + statusClass + '">' + prod.stock + '</span></td>';
-                html += '<td style="text-align: center;">' + prod.alertThreshold + '</td>';
-                html += '<td style="text-align: center;"><span class="badge ' + (prod.stock <= prod.alertThreshold ? 'stock-low' : 'stock-ok') + '">' + statusText + '</span></td>';
-                html += '<td style="text-align: center;">';
-                html += '<div class="stock-controls">';
-                html += '<button class="stock-btn stock-in" onclick="openAddStockModal(\'' + prod.code + '\')" title="Entrée de stock"><i class="fas fa-plus"></i></button>';
-                html += '<button class="stock-btn stock-view" onclick="viewProductStock(\'' + prod.code + '\')" title="Voir détails"><i class="fas fa-eye"></i></button>';
-                html += '</div>';
-                html += '</td>';
-                html += '</tr>';
-            }
 
             tbody.innerHTML = html;
         }
 
-        function openAddStockModal(productCode) {
-            var select = document.getElementById('stockProduct');
-            select.innerHTML = '<option value="">-- Choisir un produit --</option>';
-
-            for (var i = 0; i < productCatalog.length; i++) {
-                var prod = productCatalog[i];
-                var option = document.createElement('option');
-                option.value = prod.code;
-                option.textContent = prod.name + ' (' + prod.stock + ' en stock)';
-                if (productCode && prod.code === productCode) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            }
-
-            document.getElementById('addStockModal').classList.add('active');
-        }
-
-        function closeAddStockModal() {
-            document.getElementById('addStockModal').classList.remove('active');
-            document.getElementById('stockProduct').value = '';
-            document.getElementById('stockQuantity').value = '1';
-            document.getElementById('stockReference').value = '';
-            document.getElementById('stockComment').value = '';
-        }
-
-        function saveStockEntry() {
-            var productCode = document.getElementById('stockProduct').value;
-            var quantity = parseInt(document.getElementById('stockQuantity').value);
-            var reference = document.getElementById('stockReference').value.trim();
-            var comment = document.getElementById('stockComment').value.trim();
-
-            if (!productCode || quantity <= 0) {
-                alert('Veuillez sélectionner un produit et une quantité valide');
-                return;
-            }
-
-            var prod = productCatalog.find(function(p) { return p.code === productCode; });
-            if (!prod) {
-                alert('Produit non trouvé');
-                return;
-            }
-
-            prod.stock += quantity;
-
-            var movement = {
-                id: Date.now(),
-                date: getCurrentDate(),
-                time: getCurrentTime(),
-                type: 'ENTREE',
-                productCode: productCode,
-                productName: prod.name,
-                quantity: quantity,
-                reference: reference,
-                comment: comment,
-                user: currentUser.name,
-                stockAfter: prod.stock
+        function getCategoryBadge(category) {
+            const badges = {
+                'achat': '<span class="expense-category-badge category-achat">Achat Stock</span>',
+                'operation': '<span class="expense-category-badge category-operation">Opérationnel</span>',
+                'maintenance': '<span class="expense-category-badge category-maintenance">Maintenance</span>',
+                'autre': '<span class="expense-category-badge category-autre">Autre</span>'
             };
-
-            stockMovements.push(movement);
-            saveStockData();
-
-            alert('Stock mis à jour : ' + prod.name + ' (+' + quantity + ') = ' + prod.stock);
-            closeAddStockModal();
-            renderStockTable();
-            checkStockAlerts();
+            return badges[category] || badges['autre'];
         }
 
-        function viewProductStock(productCode) {
-            var prod = productCatalog.find(function(p) { return p.code === productCode; });
-            if (!prod) return;
+        async function deleteExpense(expenseId) {
+            if (!confirm('Supprimer cette dépense ?')) return;
 
-            var movements = stockMovements.filter(function(m) { return m.productCode === productCode; });
+            try {
+                const { error } = await supabaseClient
+                    .from('expenses')
+                    .delete()
+                    .eq('id', expenseId);
 
-            var html = '<h3>Historique du stock - ' + prod.name + '</h3>';
-            html += '<div style="margin-bottom: 1rem;"><strong>Stock actuel : </strong>' + prod.stock + ' unités</div>';
-            html += '<div class="table-container">';
-            html += '<table>';
-            html += '<thead><tr><th>Date & Heure</th><th>Type</th><th>Quantité</th><th>Référence</th><th>Utilisateur</th><th>Stock Après</th><th>Commentaire</th></tr></thead>';
-            html += '<tbody>';
+                if (error) throw error;
 
-            movements.forEach(function(m) {
-                html += '<tr>';
-                html += '<td>' + m.date + ' ' + m.time + '</td>';
-                html += '<td>' + (m.type === 'ENTREE' ? '<span style="color:green">ENTRÉE</span>' : '<span style="color:red">SORTIE</span>') + '</td>';
-                html += '<td>' + (m.type === 'ENTREE' ? '+' : '-') + m.quantity + '</td>';
-                html += '<td>' + m.reference + '</td>';
-                html += '<td>' + m.user + '</td>';
-                html += '<td>' + m.stockAfter + '</td>';
-                html += '<td>' + (m.comment || '-') + '</td>';
-                html += '</tr>';
-            });
-
-            html += '</tbody></table></div>';
-
-            document.getElementById('stockReportContent').innerHTML = html;
-            document.getElementById('stockReportModal').classList.add('active');
-        }
-
-        function openStockReport() {
-            var html = '<h3>Rapport de Stock Global</h3>';
-            html += '<div class="stats-grid" style="margin-bottom: 2rem;">';
-
-            var totalProducts = productCatalog.length;
-            var lowStockProducts = 0;
-            var totalValue = 0;
-
-            productCatalog.forEach(function(prod) {
-                if (prod.stock <= prod.alertThreshold) lowStockProducts++;
-                totalValue += prod.stock * prod.price;
-            });
-
-            html += '<div class="stat-card"><div class="stat-info"><h3>Total Produits</h3><p>' + totalProducts + '</p></div><div class="stat-icon blue"><i class="fas fa-box"></i></div></div>';
-            html += '<div class="stat-card"><div class="stat-info"><h3>Stock Faible</h3><p>' + lowStockProducts + '</p></div><div class="stat-icon orange"><i class="fas fa-exclamation-triangle"></i></div></div>';
-            html += '<div class="stat-card"><div class="stat-info"><h3>Valeur Totale</h3><p>' + totalValue.toLocaleString('fr-FR') + ' FCFA</p></div><div class="stat-icon purple"><i class="fas fa-euro-sign"></i></div></div>';
-            html += '</div>';
-
-            html += '<div class="table-container">';
-            html += '<table>';
-            html += '<thead><tr><th>Produit</th><th>Stock</th><th>Seuil</th><th>Valeur</th><th>Statut</th></tr></thead>';
-            html += '<tbody>';
-
-            productCatalog.forEach(function(prod) {
-                var value = prod.stock * prod.price;
-                var status = prod.stock <= prod.alertThreshold ? '<span class="stock-low">Stock faible</span>' : '<span class="stock-ok">OK</span>';
-
-                html += '<tr>';
-                html += '<td><strong>' + prod.name + '</strong><br><small style="color: #7f8c8d;">' + prod.code + '</small></td>';
-                html += '<td style="text-align: center;">' + prod.stock + '</td>';
-                html += '<td style="text-align: center;">' + prod.alertThreshold + '</td>';
-                html += '<td style="text-align: right;">' + value.toLocaleString('fr-FR') + ' FCFA</td>';
-                html += '<td style="text-align: center;">' + status + '</td>';
-                html += '</tr>';
-            });
-
-            html += '</tbody></table></div>';
-
-            document.getElementById('stockReportContent').innerHTML = html;
-            document.getElementById('stockReportModal').classList.add('active');
-        }
-
-        function closeStockReport() {
-            document.getElementById('stockReportModal').classList.remove('active');
-        }
-
-        function saveStockData() {
-            var stockData = {};
-            productCatalog.forEach(function(prod) {
-                stockData[prod.code] = {
-                    stock: prod.stock,
-                    alertThreshold: prod.alertThreshold
-                };
-            });
-            localStorage.setItem('productStock', JSON.stringify(stockData));
-            localStorage.setItem('stockMovements', JSON.stringify(stockMovements));
-        }
-
-        function checkStockAlerts() {
-            var lowStockProducts = [];
-            productCatalog.forEach(function(prod) {
-                if (prod.stock <= prod.alertThreshold) {
-                    lowStockProducts.push(prod.name);
-                }
-            });
-
-            if (lowStockProducts.length > 0) {
-                alerts.push({
-                    type: 'warning',
-                    message: 'Stock faible pour : ' + lowStockProducts.join(', ')
-                });
+                showAlert('Dépense supprimée avec succès', 'success');
+                await loadExpenses();
+                updateStats();
+            } catch (error) {
+                console.error('Erreur suppression:', error);
+                showAlert('Erreur lors de la suppression', 'danger');
             }
         }
 
-        function updateProductStock(productCode, quantitySold) {
-            var prod = productCatalog.find(function(p) { return p.code === productCode; });
-            if (prod) {
-                prod.stock -= quantitySold;
+        // MODAL DÉPENSE
+        function openExpenseModal() {
+            document.getElementById('expenseModalTitle').textContent = 'Nouvelle Dépense';
+            document.getElementById('expenseDate').value = getCurrentDateISO();
+            document.getElementById('expenseCategory').value = '';
+            document.getElementById('expenseLibelle').value = '';
+            document.getElementById('expenseReference').value = '';
+            document.getElementById('expenseQuantity').value = '1';
+            document.getElementById('expenseUnitPrice').value = '';
+            document.getElementById('expenseTotal').value = '0';
+            document.getElementById('expenseNotes').value = '';
+            document.getElementById('expenseModal').classList.add('active');
+        }
 
-                var movement = {
-                    id: Date.now(),
-                    date: getCurrentDate(),
-                    time: getCurrentTime(),
-                    type: 'SORTIE',
-                    productCode: productCode,
-                    productName: prod.name,
-                    quantity: quantitySold,
-                    reference: 'VENTE-' + Date.now(),
-                    comment: 'Vente automatique',
-                    user: currentUser.name,
-                    stockAfter: prod.stock
+        function closeExpenseModal() {
+            document.getElementById('expenseModal').classList.remove('active');
+        }
+
+        function calculateExpenseTotal() {
+            const quantity = parseInt(document.getElementById('expenseQuantity').value) || 0;
+            const unitPrice = parseFloat(document.getElementById('expenseUnitPrice').value) || 0;
+            document.getElementById('expenseTotal').value = quantity * unitPrice;
+        }
+
+        async function saveExpense() {
+            const date = document.getElementById('expenseDate').value;
+            const category = document.getElementById('expenseCategory').value;
+            const libelle = document.getElementById('expenseLibelle').value.trim();
+            const reference = document.getElementById('expenseReference').value.trim();
+            const quantity = parseInt(document.getElementById('expenseQuantity').value) || 1;
+            const unitPrice = parseFloat(document.getElementById('expenseUnitPrice').value) || 0;
+            const notes = document.getElementById('expenseNotes').value.trim();
+
+            if (!category || !libelle || unitPrice <= 0) {
+                showAlert('Veuillez remplir tous les champs obligatoires', 'warning');
+                return;
+            }
+
+            try {
+                updateSyncStatus('syncing');
+                
+                const expenseData = {
+                    expense_date: date,
+                    category: category,
+                    libelle: libelle,
+                    reference: reference,
+                    quantity: quantity,
+                    unit_price: unitPrice,
+                    total: quantity * unitPrice,
+                    notes: notes,
+                    user_name: currentUser.name
                 };
 
-                stockMovements.push(movement);
-                saveStockData();
+                const { data, error } = await supabaseClient
+                    .from('expenses')
+                    .insert([expenseData])
+                    .select();
+
+                if (error) throw error;
+
+                showAlert('Dépense enregistrée avec succès !', 'success');
+                closeExpenseModal();
+                await loadExpenses();
+                updateStats();
+                updateSyncStatus('synced');
+            } catch (error) {
+                console.error('Erreur sauvegarde:', error);
+                showAlert('Erreur lors de l\'enregistrement', 'danger');
+                updateSyncStatus('error');
             }
         }
 
-        // 🛒 Vente rapide
-        const quickData = {};
-
+        // VENTE RAPIDE
         function openQuickSale() {
             buildProductsGrid();
             resetQuickData();
@@ -1887,7 +796,7 @@
         }
 
         function resetQuickData() {
-            for (const c in quickData) delete quickData[c];
+            quickData = {};
             document.getElementById('quickOM').value = 0;
             document.getElementById('quickMOMO').value = 0;
             document.getElementById('quickCASH').value = 0;
@@ -1897,17 +806,17 @@
         function buildProductsGrid() {
             const grid = document.getElementById('quickProductsGrid');
             grid.innerHTML = '';
-            productCatalog.forEach(p => {
+            
+            products.forEach(p => {
                 const card = document.createElement('div');
                 card.className = 'prod-card';
-                card.dataset.code = p.code;
                 card.innerHTML = `
-                    <div class="prod-name">${p.name}</div>
-                    <div class="prod-price">${p.price.toLocaleString('fr-FR')} FCFA</div>
+                    <div style="font-weight:600;font-size:0.8rem">${p.name}</div>
+                    <div style="font-size:0.75rem;color:#7f8c8d">${p.price.toLocaleString()} FCFA</div>
                     <div style="font-size:0.7rem;color:${p.stock<=p.alertThreshold?'#f44336':'#4caf50'}">Stock: ${p.stock}</div>
-                    <div class="qty-controls">
+                    <div style="display:flex;align-items:center;justify-content:center;margin-top:0.4rem;gap:0.25rem">
                         <button class="qty-btn" onclick="changeQty('${p.code}',-1)">-</button>
-                        <input type="number" class="qty-input" id="q_${p.code}" value="0" min="0" max="${p.stock}" readonly>
+                        <input type="number" class="qty-input" id="q_${p.code}" value="0" min="0" readonly>
                         <button class="qty-btn" onclick="changeQty('${p.code}',1)">+</button>
                     </div>
                 `;
@@ -1917,14 +826,16 @@
 
         function changeQty(code, delta) {
             const input = document.getElementById('q_' + code);
-            const prod = productCatalog.find(x => x.code === code);
+            const prod = products.find(x => x.code === code);
             let v = parseInt(input.value) || 0;
             v += delta;
+            
             if (v < 0) v = 0;
             if (v > prod.stock) {
-                alert('Stock insuffisant! Stock disponible: ' + prod.stock);
+                showAlert(`Stock insuffisant! Disponible: ${prod.stock}`, 'warning');
                 return;
             }
+            
             input.value = v;
             quickData[code] = { name: prod.name, price: prod.price, qty: v };
             updateQuickTotal();
@@ -1932,16 +843,18 @@
 
         function updateQuickTotal() {
             let total = 0, items = 0, recap = '';
+            
             for (const c in quickData) {
                 if (quickData[c].qty > 0) {
                     const sub = quickData[c].price * quickData[c].qty;
                     total += sub;
                     items += quickData[c].qty;
-                    recap += `<div class="recap-item"><span>${quickData[c].name} ×${quickData[c].qty}</span><span>${sub.toLocaleString('fr-FR')}</span></div>`;
+                    recap += `<div style="display:flex;justify-content:space-between;padding:0.25rem 0.5rem;font-size:0.8rem"><span>${quickData[c].name} ×${quickData[c].qty}</span><span>${sub.toLocaleString()}</span></div>`;
                 }
             }
+            
             document.getElementById('quickRecap').innerHTML = recap || '<div style="color:#95a5a6;text-align:center">Aucun produit sélectionné</div>';
-            document.getElementById('quickTotal').textContent = total.toLocaleString('fr-FR');
+            document.getElementById('quickTotal').textContent = total.toLocaleString();
             document.getElementById('recapBadge').textContent = items + ' article(s)';
             balanceQuickPayments();
         }
@@ -1954,857 +867,491 @@
             document.getElementById('quickCASH').value = cash;
         }
 
-        function saveQuickSale() {
+        async function saveQuickSale() {
             const items = [];
             const stockUpdates = {};
+            
             for (const c in quickData) {
                 if (quickData[c].qty > 0) {
                     for (let i = 0; i < quickData[c].qty; i++) items.push(c);
                     stockUpdates[c] = quickData[c].qty;
                 }
             }
-            if (items.length === 0) { alert('Aucun produit sélectionné'); return; }
-
-            for (const code in stockUpdates) {
-                const prod = productCatalog.find(p => p.code === code);
-                if (!prod || prod.stock < stockUpdates[code]) {
-                    alert('Stock insuffisant pour ' + prod.name + '! Stock disponible: ' + prod.stock);
-                    return;
-                }
+            
+            if (items.length === 0) {
+                showAlert('Aucun produit sélectionné', 'warning');
+                return;
             }
 
             const total = parseInt(document.getElementById('quickTotal').textContent.replace(/\s/g, '')) || 0;
             const om = parseInt(document.getElementById('quickOM').value) || 0;
             const momo = parseInt(document.getElementById('quickMOMO').value) || 0;
             const cash = parseInt(document.getElementById('quickCASH').value) || 0;
-            if (om + momo + cash !== total) { alert('La répartition des paiements est incorrecte'); return; }
-
-            for (const code in stockUpdates) {
-                updateProductStock(code, stockUpdates[code]);
+            
+            if (om + momo + cash !== total) {
+                showAlert('La répartition des paiements est incorrecte', 'warning');
+                return;
             }
 
-            const now = new Date();
-            const saleData = {
-                serverName: currentUser.name,
-                serverUsername: currentUser.username,
-                quantity: items.length,
-                products: items,
-                unitPrice: Math.round(total / items.length),
-                totalAmount: total,
-                paymentOM: om,
-                paymentMOMO: momo,
-                paymentCASH: cash,
-                date: getCurrentDate(),
-                time: getCurrentTime(),
-                dateTime: getCurrentDate() + ' ' + getCurrentTime()
-            };
-            let newId = 1; sales.forEach(s => { if (s.id >= newId) newId = s.id + 1; });
-            saleData.id = newId;
-            sales.push(saleData);
-            localStorage.setItem('sales', JSON.stringify(sales));
-            lastReceipt = saleData;
-            renderSales();
-            updateStats();
-            if (currentUser.role === 'server') updateServerDashboard();
-            closeQuickSale();
-            checkAlerts();
-            setTimeout(() => { if (confirm('Voulez-vous imprimer le reçu ?')) printReceiptData(saleData); }, 500);
-        }
+            try {
+                updateSyncStatus('syncing');
 
-        // 👥 Utilisateurs
-        function openUserManagement() {
-            renderUsersList();
-            document.getElementById('userManagementModal').classList.add('active');
-        }
-
-        function closeUserManagementModal() {
-            document.getElementById('userManagementModal').classList.remove('active');
-        }
-
-        function renderUsersList() {
-            var html = '<table style="width: 100%;">';
-            html += '<thead><tr><th>Nom</th><th>Nom d\'utilisateur</th><th>Rôle</th><th>Actions</th></tr></thead>';
-            html += '<tbody>';
-
-            for (var username in users) {
-                var user = users[username];
-                if (user.role === 'server') {
-                    html += '<tr>';
-                    html += '<td>' + user.name + '</td>';
-                    html += '<td>' + username + '</td>';
-                    html += '<td>Serveuse</td>';
-                    html += '<td>';
-                    html += '<button class="action-btn btn-edit" onclick="editUser(\'' + username + '\')" title="Modifier" style="margin-right: 0.5rem;"><i class="fas fa-edit"></i></button>';
-                    html += '<button class="action-btn btn-delete" onclick="deleteUser(\'' + username + '\')" title="Supprimer"><i class="fas fa-trash"></i></button>';
-                    html += '</td>';
-                    html += '</tr>';
+                // Mettre à jour le stock local
+                for (const code in stockUpdates) {
+                    const prod = products.find(p => p.code === code);
+                    if (prod) prod.stock -= stockUpdates[code];
                 }
-            }
 
-            html += '</tbody></table>';
-            document.getElementById('usersList').innerHTML = html;
-        }
+                const saleData = {
+                    server_name: currentUser.name,
+                    server_username: currentUser.username,
+                    quantity: items.length,
+                    products: items,
+                    unit_price: Math.round(total / items.length),
+                    total_amount: total,
+                    payment_om: om,
+                    payment_momo: momo,
+                    payment_cash: cash
+                };
 
-        function editUser(username) {
-            var user = users[username];
-            document.getElementById('editUsername').value = username;
-            document.getElementById('editUserFullname').value = user.name;
-            document.getElementById('editUserPassword').value = '';
-            document.getElementById('editUserModal').classList.add('active');
-        }
+                const { data, error } = await supabaseClient
+                    .from('sales')
+                    .insert([saleData])
+                    .select();
 
-        function closeEditUserModal() {
-            document.getElementById('editUserModal').classList.remove('active');
-        }
+                if (error) throw error;
 
-        function updateUser() {
-            var username = document.getElementById('editUsername').value;
-            var fullname = document.getElementById('editUserFullname').value.trim();
-            var password = document.getElementById('editUserPassword').value.trim();
-
-            if (!fullname) {
-                alert('Veuillez entrer un nom complet');
-                return;
-            }
-
-            if (password && password.length < 6) {
-                alert('Le mot de passe doit contenir au moins 6 caractères');
-                return;
-            }
-
-            users[username].name = fullname;
-            if (password) {
-                users[username].password = password;
-            }
-
-            alert('Utilisateur modifié avec succès !');
-            renderUsersList();
-            closeEditUserModal();
-        }
-
-        function deleteUser(username) {
-            if (confirm('Supprimer cette serveuse ?')) {
-                delete users[username];
-                renderUsersList();
+                showAlert('Vente enregistrée avec succès !', 'success');
+                closeQuickSale();
+                await loadSales();
+                updateStats();
+                updateSyncStatus('synced');
+            } catch (error) {
+                console.error('Erreur sauvegarde vente:', error);
+                showAlert('Erreur lors de l\'enregistrement', 'danger');
+                updateSyncStatus('error');
             }
         }
 
-        function openAddUserModal() {
-            document.getElementById('addUserModal').classList.add('active');
+        // GESTION STOCK
+        function openStockManagement() {
+            renderStockTable();
+            document.getElementById('stockModal').classList.add('active');
         }
 
-        function closeAddUserModal() {
-            document.getElementById('addUserModal').classList.remove('active');
-            document.getElementById('newUsername').value = '';
-            document.getElementById('newUserFullname').value = '';
-            document.getElementById('newUserPassword').value = '';
+        function closeStockModal() {
+            document.getElementById('stockModal').classList.remove('active');
         }
 
-        function saveNewUser() {
-            var username = document.getElementById('newUsername').value.trim().toLowerCase();
-            var fullname = document.getElementById('newUserFullname').value.trim();
-            var password = document.getElementById('newUserPassword').value.trim();
+        function renderStockTable() {
+            const tbody = document.getElementById('stockTableBody');
+            let html = '';
 
-            if (!username || !fullname || !password) {
-                alert('Veuillez remplir tous les champs');
-                return;
-            }
+            products.forEach(prod => {
+                const statusClass = prod.stock <= prod.alertThreshold ? 'stock-low' : 'stock-ok';
+                const statusText = prod.stock <= prod.alertThreshold ? 'Stock faible' : 'OK';
+                const value = prod.stock * prod.price;
 
-            if (password.length < 6) {
-                alert('Le mot de passe doit contenir au moins 6 caractères');
-                return;
-            }
-
-            if (users[username]) {
-                alert('Ce nom d\'utilisateur existe déjà');
-                return;
-            }
-
-            users[username] = { password: password, role: 'server', name: fullname };
-            alert('Serveuse ajoutée avec succès !');
-            renderUsersList();
-            closeAddUserModal();
-        }
-
-        // 🧾 Reçu
-        function printReceiptData(saleData) {
-            var productsText = saleData.products.map(function(p) {
-                var prod = productCatalog.find(function(pc) { return pc.code === p; });
-                return prod ? prod.name : p;
-            }).join(', ');
-
-            var receiptHtml = '';
-            receiptHtml += '<div class="receipt-header">';
-            receiptHtml += '<h3>ART\'RISE</h3>';
-            receiptHtml += '<p>Reçu de Vente</p>';
-            receiptHtml += '<p>' + new Date().toLocaleString('fr-FR') + '</p>';
-            receiptHtml += '</div>';
-
-            receiptHtml += '<div class="receipt-body">';
-            receiptHtml += '<div class="receipt-item"><span><strong>Vendeuse:</strong></span><span>' + saleData.serverName + '</span></div>';
-            receiptHtml += '<div class="receipt-item"><span><strong>Produits:</strong></span><span>' + productsText + '</span></div>';
-            receiptHtml += '<div class="receipt-item"><span><strong>Quantité:</strong></span><span>' + saleData.quantity + '</span></div>';
-            receiptHtml += '<div class="receipt-item"><span><strong>Total:</strong></span><span>' + saleData.totalAmount.toLocaleString('fr-FR') + ' FCFA</span></div>';
-            receiptHtml += '</div>';
-
-            receiptHtml += '<div class="receipt-footer">';
-            receiptHtml += '<p><strong>Paiement:</strong></p>';
-            if (saleData.paymentOM > 0) receiptHtml += '<p>OM: ' + saleData.paymentOM.toLocaleString('fr-FR') + ' FCFA</p>';
-            if (saleData.paymentMOMO > 0) receiptHtml += '<p>MOMO: ' + saleData.paymentMOMO.toLocaleString('fr-FR') + ' FCFA</p>';
-            if (saleData.paymentCASH > 0) receiptHtml += '<p>CASH: ' + saleData.paymentCASH.toLocaleString('fr-FR') + ' FCFA</p>';
-            receiptHtml += '<p style="margin-top: 1rem; font-size: 0.8rem;">Merci pour votre confiance!</p>';
-            receiptHtml += '</div>';
-
-            document.getElementById('receiptContent').innerHTML = receiptHtml;
-            document.getElementById('receiptModal').classList.add('active');
-        }
-
-        function printReceipt() {
-            window.print();
-        }
-
-        function closeReceiptModal() {
-            document.getElementById('receiptModal').classList.remove('active');
-        }
-
-        // 💶 Dépenses
-        function loadExpenses() {
-            var savedExpenses = localStorage.getItem('expenses');
-            if (savedExpenses) {
-                expenses = JSON.parse(savedExpenses);
-            }
-            renderExpenses();
-            updateExpenseStats();
-        }
-
-        function saveExpenses() {
-            localStorage.setItem('expenses', JSON.stringify(expenses));
-        }
-
-        function renderExpenses() {
-            var tbody = document.getElementById('expenseTableBody');
-            var html = '';
-
-            for (var i = 0; i < expenses.length; i++) {
-                var expense = expenses[i];
-                html += '<tr>';
-                html += '<td>' + expense.date + '</td>';
-                html += '<td>' + expense.libelle + '</td>';
-                html += '<td>' + expense.reference + '</td>';
-                html += '<td style="text-align: center;">' + expense.quantity + '</td>';
-                html += '<td style="text-align: right;">' + expense.unitPrice.toLocaleString('fr-FR') + ' FCFA</td>';
-                html += '<td style="text-align: right;"><strong>' + expense.total.toLocaleString('fr-FR') + ' FCFA</strong></td>';
-                html += '<td style="text-align: center;">';
-                html += '<button class="action-btn btn-delete" onclick="deleteExpense(' + i + ')" title="Supprimer"><i class="fas fa-trash"></i></button>';
-                html += '</td>';
-                html += '</tr>';
-            }
+                html += `
+                    <tr>
+                        <td><strong>${prod.name}</strong><br><small style="color:#7f8c8d">${prod.code}</small></td>
+                        <td style="text-align:center"><span class="${statusClass}">${prod.stock}</span></td>
+                        <td style="text-align:center">${prod.alertThreshold}</td>
+                        <td style="text-align:right">${prod.price.toLocaleString()} FCFA</td>
+                        <td style="text-align:right">${value.toLocaleString()} FCFA</td>
+                        <td style="text-align:center"><span style="padding:0.25rem 0.5rem;border-radius:4px;font-size:0.75rem;font-weight:600;background:${prod.stock <= prod.alertThreshold ? '#ffebee' : '#e8f5e9'};color:${prod.stock <= prod.alertThreshold ? '#d32f2f' : '#2e7d32'}">${statusText}</span></td>
+                        <td style="text-align:center">
+                            <button class="action-btn btn-edit" onclick="openAddStockModal('${prod.code}')" title="Ajouter du stock">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
 
             tbody.innerHTML = html;
         }
 
-        function updateExpenseStats() {
-            var today = getCurrentDate();
-            var dailyTotal = 0;
-            var total = 0;
+        function openAddStockModal(productCode) {
+            const select = document.getElementById('stockProduct');
+            select.innerHTML = '<option value="">-- Choisir un produit --</option>';
 
-            for (var i = 0; i < expenses.length; i++) {
-                var expense = expenses[i];
-                total += expense.total;
-                if (expense.date === today) {
-                    dailyTotal += expense.total;
+            products.forEach(prod => {
+                const option = document.createElement('option');
+                option.value = prod.code;
+                option.textContent = `${prod.name} (${prod.stock} en stock)`;
+                if (productCode && prod.code === productCode) {
+                    option.selected = true;
                 }
-            }
+                select.appendChild(option);
+            });
 
-            document.getElementById('dailyExpenses').textContent = dailyTotal.toLocaleString('fr-FR') + ' FCFA';
-            document.getElementById('totalExpenses').textContent = total.toLocaleString('fr-FR') + ' FCFA';
+            document.getElementById('addStockModal').classList.add('active');
         }
 
-        function openExpenseModal() {
-            document.getElementById('expenseDate').value = getCurrentDate();
-            document.getElementById('expenseModal').classList.add('active');
+        function closeAddStockModal() {
+            document.getElementById('addStockModal').classList.remove('active');
         }
 
-        function closeExpenseModal() {
-            document.getElementById('expenseModal').classList.remove('active');
-            document.getElementById('expenseForm').reset();
-        }
-
-        function saveExpense() {
-            var date = document.getElementById('expenseDate').value || getCurrentDate();
-            var libelle = document.getElementById('expenseLibelle').value.trim();
-            var reference = document.getElementById('expenseReference').value.trim();
-            var quantity = parseInt(document.getElementById('expenseQuantity').value) || 1;
-            var unitPrice = parseFloat(document.getElementById('expenseUnitPrice').value) || 0;
-
-            if (!libelle) {
-                alert('Veuillez entrer le libellé de la dépense');
+        async function saveStockEntry() {
+            const productCode = document.getElementById('stockProduct').value;
+            const quantity = parseInt(document.getElementById('stockQuantity').value);
+            
+            if (!productCode || quantity <= 0) {
+                showAlert('Veuillez remplir tous les champs', 'warning');
                 return;
             }
 
-            var expense = {
-                date: date,
-                libelle: libelle,
-                reference: reference,
-                quantity: quantity,
-                unitPrice: unitPrice,
-                total: quantity * unitPrice
-            };
+            const prod = products.find(p => p.code === productCode);
+            if (!prod) return;
 
-            expenses.push(expense);
-            saveExpenses();
-            renderExpenses();
-            updateExpenseStats();
-            closeExpenseModal();
+            prod.stock += quantity;
+            
+            showAlert(`Stock mis à jour : ${prod.name} (+${quantity}) = ${prod.stock}`, 'success');
+            closeAddStockModal();
+            renderStockTable();
+            updateStats();
         }
 
-        function deleteExpense(index) {
-            if (confirm('Supprimer cette dépense ?')) {
-                expenses.splice(index, 1);
-                saveExpenses();
-                renderExpenses();
-                updateExpenseStats();
+        // STATISTIQUES
+        function updateStats() {
+            const today = getCurrentDate();
+            
+            // Ventes du jour
+            const todaySales = sales.filter(s => formatDate(s.created_at) === today);
+            const todayRevenue = todaySales.reduce((sum, s) => sum + s.total_amount, 0);
+            
+            // Dépenses du jour
+            const todayExpenses = expenses.filter(e => formatDate(e.expense_date) === today);
+            const todayExpensesTotal = todayExpenses.reduce((sum, e) => sum + e.total, 0);
+            
+            // Résultat net
+            const netResult = todayRevenue - todayExpensesTotal;
+            
+            // Stock
+            const lowStock = products.filter(p => p.stock <= p.alertThreshold).length;
+            const stockValue = products.reduce((sum, p) => sum + (p.stock * p.price), 0);
+
+            document.getElementById('todaySales').textContent = todaySales.length;
+            document.getElementById('todayRevenue').textContent = todayRevenue.toLocaleString() + ' FCFA';
+            document.getElementById('todayExpenses').textContent = todayExpensesTotal.toLocaleString() + ' FCFA';
+            document.getElementById('netResult').textContent = netResult.toLocaleString() + ' FCFA';
+            document.getElementById('netResult').style.color = netResult >= 0 ? '#4caf50' : '#f44336';
+            document.getElementById('lowStockCount').textContent = lowStock;
+            document.getElementById('stockValue').textContent = stockValue.toLocaleString() + ' FCFA';
+        }
+
+        function checkLowStock() {
+            const lowStock = products.filter(p => p.stock <= p.alertThreshold);
+            if (lowStock.length > 0) {
+                const names = lowStock.map(p => p.name).join(', ');
+                showAlert(`⚠️ Stock faible pour : ${names}`, 'warning');
             }
         }
 
-        // 📊 Statistiques serveuses
-        function toggleServerStats() {
-            var statsSection = document.getElementById('serverStatsSection');
-            var isVisible = statsSection.style.display !== 'none';
-
-            if (isVisible) {
-                statsSection.style.display = 'none';
-            } else {
-                statsSection.style.display = 'block';
-                updateServerStats();
-            }
-        }
-
-        function updateServerStats() {
-            var serverStats = {};
-            var totalSales = sales.length;
-
-            for (var i = 0; i < sales.length; i++) {
-                var sale = sales[i];
-                var serverName = sale.serverName;
-
-                if (!serverStats[serverName]) {
-                    serverStats[serverName] = {
-                        sales: 0,
-                        items: 0,
-                        totalRevenue: 0,
-                        performance: 0
-                    };
-                }
-
-                serverStats[serverName].sales++;
-                serverStats[serverName].items += sale.quantity;
-                serverStats[serverName].totalRevenue += (sale.totalAmount || (sale.paymentOM + sale.paymentMOMO + sale.paymentCASH));
-            }
-
-            for (var server in serverStats) {
-                serverStats[server].performance = ((serverStats[server].sales / totalSales) * 100).toFixed(1);
-                serverStats[server].avgSale = (serverStats[server].totalRevenue / serverStats[server].sales).toFixed(0);
-            }
-
-            renderServerStats(serverStats);
-        }
-
-        function renderServerStats(serverStats) {
-            var grid = document.getElementById('serverStatsGrid');
-            var html = '';
-
-            for (var server in serverStats) {
-                var stats = serverStats[server];
-                html += `
-                    <div class="stat-card">
-                        <div class="stat-info">
-                            <h3>${server}</h3>
-                            <p>${stats.sales} ventes</p>
-                            <small>${stats.performance}% du total</small>
+        // RAPPORTS
+        async function generateReport() {
+            try {
+                const today = getCurrentDate();
+                
+                // Calculs
+                const todaySales = sales.filter(s => formatDate(s.created_at) === today);
+                const todayRevenue = todaySales.reduce((sum, s) => sum + s.total_amount, 0);
+                const todayExpenses = expenses.filter(e => formatDate(e.expense_date) === today);
+                const todayExpensesTotal = todayExpenses.reduce((sum, e) => sum + e.total, 0);
+                
+                const report = {
+                    date: today,
+                    ventes: todaySales.length,
+                    chiffre_affaires: todayRevenue,
+                    depenses: todayExpensesTotal,
+                    resultat_net: todayRevenue - todayExpensesTotal,
+                    details_ventes: todaySales,
+                    details_depenses: todayExpenses
+                };
+                
+                showAlert(`📊 Rapport du ${today} généré avec succès`, 'success');
+                console.log('Rapport:', report);
+                
+                // Créer un rapport détaillé
+                let reportHTML = `
+                    <div style="background:white;padding:2rem;border-radius:12px;max-width:800px;margin:2rem auto">
+                        <h2 style="text-align:center;color:#2c3e50;margin-bottom:2rem">📊 Rapport Journalier - ${today}</h2>
+                        
+                        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:2rem">
+                            <div style="background:#e3f2fd;padding:1rem;border-radius:8px">
+                                <h4 style="color:#1976d2">Ventes</h4>
+                                <p style="font-size:1.5rem;font-weight:bold">${todaySales.length}</p>
+                            </div>
+                            <div style="background:#e8f5e9;padding:1rem;border-radius:8px">
+                                <h4 style="color:#2e7d32">Chiffre d'Affaires</h4>
+                                <p style="font-size:1.5rem;font-weight:bold">${todayRevenue.toLocaleString()} FCFA</p>
+                            </div>
+                            <div style="background:#ffebee;padding:1rem;border-radius:8px">
+                                <h4 style="color:#d32f2f">Dépenses</h4>
+                                <p style="font-size:1.5rem;font-weight:bold">${todayExpensesTotal.toLocaleString()} FCFA</p>
+                            </div>
+                            <div style="background:#f3e5f5;padding:1rem;border-radius:8px">
+                                <h4 style="color:#7b1fa2">Résultat Net</h4>
+                                <p style="font-size:1.5rem;font-weight:bold;color:${report.resultat_net >= 0 ? '#4caf50' : '#f44336'}">${report.resultat_net.toLocaleString()} FCFA</p>
+                            </div>
                         </div>
-                        <div class="stat-icon purple"><i class="fas fa-user-tie"></i></div>
+                        
+                        <div style="margin-bottom:1rem">
+                            <h3 style="color:#2c3e50;margin-bottom:1rem">Détails des Ventes</h3>
+                            ${todaySales.length > 0 ? todaySales.map(s => `
+                                <div style="border-bottom:1px solid #ecf0f1;padding:0.5rem 0">
+                                    <strong>${s.server_name}</strong> - ${s.quantity} articles - ${s.total_amount.toLocaleString()} FCFA
+                                </div>
+                            `).join('') : '<p style="color:#95a5a6">Aucune vente</p>'}
+                        </div>
+                        
+                        <div>
+                            <h3 style="color:#2c3e50;margin-bottom:1rem">Détails des Dépenses</h3>
+                            ${todayExpenses.length > 0 ? todayExpenses.map(e => `
+                                <div style="border-bottom:1px solid #ecf0f1;padding:0.5rem 0">
+                                    <strong>${e.libelle}</strong> - ${e.quantity} × ${e.unit_price.toLocaleString()} = ${e.total.toLocaleString()} FCFA
+                                </div>
+                            `).join('') : '<p style="color:#95a5a6">Aucune dépense</p>'}
+                        </div>
+                    </div>
+                `;
+                
+                // Afficher dans une alerte
+                const reportWindow = window.open('', '_blank');
+                reportWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Rapport ${today}</title>
+                        <meta charset="UTF-8">
+                        <style>
+                            body { font-family: 'Segoe UI', sans-serif; background: #f5f7fa; margin: 0; padding: 20px; }
+                            @media print { body { background: white; } }
+                        </style>
+                    </head>
+                    <body>
+                        ${reportHTML}
+                        <div style="text-align:center;margin-top:2rem">
+                            <button onclick="window.print()" style="padding:0.75rem 1.5rem;background:#5c6bc0;color:white;border:none;border-radius:8px;cursor:pointer;font-size:1rem">
+                                🖨️ Imprimer
+                            </button>
+                        </div>
+                    </body>
+                    </html>
+                `);
+                
+            } catch (error) {
+                console.error('Erreur génération rapport:', error);
+                showAlert('Erreur lors de la génération du rapport', 'danger');
+            }
+        }
+
+        // EXPORT EXCEL
+        async function exportToExcel() {
+            try {
+                const wb = XLSX.utils.book_new();
+                
+                // Feuille Ventes
+                const salesData = sales.map(s => ({
+                    'Date': formatDateTime(s.created_at),
+                    'Vendeur': s.server_name,
+                    'Quantité': s.quantity,
+                    'Montant': s.total_amount,
+                    'OM': s.payment_om,
+                    'MOMO': s.payment_momo,
+                    'CASH': s.payment_cash
+                }));
+                const wsSales = XLSX.utils.json_to_sheet(salesData);
+                XLSX.utils.book_append_sheet(wb, wsSales, 'Ventes');
+                
+                // Feuille Dépenses
+                const expensesData = expenses.map(e => ({
+                    'Date': formatDate(e.expense_date),
+                    'Catégorie': e.category,
+                    'Libellé': e.libelle,
+                    'Référence': e.reference || '',
+                    'Quantité': e.quantity,
+                    'Prix Unitaire': e.unit_price,
+                    'Total': e.total,
+                    'Saisi par': e.user_name
+                }));
+                const wsExpenses = XLSX.utils.json_to_sheet(expensesData);
+                XLSX.utils.book_append_sheet(wb, wsExpenses, 'Dépenses');
+                
+                // Feuille Stock
+                const stockData = products.map(p => ({
+                    'Code': p.code,
+                    'Produit': p.name,
+                    'Stock': p.stock,
+                    'Seuil Alerte': p.alertThreshold,
+                    'Prix': p.price,
+                    'Valeur': p.stock * p.price
+                }));
+                const wsStock = XLSX.utils.json_to_sheet(stockData);
+                XLSX.utils.book_append_sheet(wb, wsStock, 'Stock');
+                
+                // Télécharger
+                const filename = `export_artrise_${getCurrentDate().replace(/\//g, '-')}.xlsx`;
+                XLSX.writeFile(wb, filename);
+                
+                showAlert('✅ Export Excel réussi !', 'success');
+            } catch (error) {
+                console.error('Erreur export:', error);
+                showAlert('Erreur lors de l\'export', 'danger');
+            }
+        }
+
+        // SYNCHRONISATION
+        async function syncStockData() {
+            try {
+                updateSyncStatus('syncing');
+                showAlert('🔄 Synchronisation en cours...', 'info');
+                
+                // Recharger toutes les données
+                await loadSales();
+                await loadExpenses();
+                
+                updateStats();
+                checkLowStock();
+                
+                updateSyncStatus('synced');
+                showAlert('✅ Synchronisation réussie !', 'success');
+            } catch (error) {
+                console.error('Erreur sync:', error);
+                updateSyncStatus('error');
+                showAlert('❌ Erreur de synchronisation', 'danger');
+            }
+        }
+
+        function updateSyncStatus(status) {
+            const statusDiv = document.getElementById('syncStatusDisplay');
+            statusDiv.className = 'sync-status ' + status;
+            
+            if (status === 'synced') {
+                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i><span>Synchronisé</span>';
+            } else if (status === 'syncing') {
+                statusDiv.innerHTML = '<i class="fas fa-sync fa-spin"></i><span>Synchronisation...</span>';
+            } else if (status === 'error') {
+                statusDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i><span>Erreur</span>';
+            }
+        }
+
+        // UTILITAIRES
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i> ${message}`;
+            
+            const container = document.getElementById('alertsContainer');
+            container.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                alertDiv.style.transition = 'opacity 0.5s';
+                alertDiv.style.opacity = '0';
+                setTimeout(() => alertDiv.remove(), 500);
+            }, 5000);
+        }
+
+        function filterSales() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filteredSales = sales.filter(s => 
+                s.server_name.toLowerCase().includes(searchTerm) ||
+                (s.products && s.products.some(p => p.toLowerCase().includes(searchTerm)))
+            );
+            
+            // Re-render avec les résultats filtrés
+            const tbody = document.getElementById('salesTableBody');
+            let html = '';
+            
+            filteredSales.forEach(sale => {
+                const productsText = sale.products ? sale.products.join(', ') : '';
+                const paymentInfo = [];
+                if (sale.payment_om > 0) paymentInfo.push(`OM: ${sale.payment_om.toLocaleString()}`);
+                if (sale.payment_momo > 0) paymentInfo.push(`MOMO: ${sale.payment_momo.toLocaleString()}`);
+                if (sale.payment_cash > 0) paymentInfo.push(`CASH: ${sale.payment_cash.toLocaleString()}`);
+
+                html += `
+                    <tr>
+                        <td>${formatDateTime(sale.created_at)}</td>
+                        <td><strong>${sale.server_name}</strong></td>
+                        <td style="font-size:0.75rem">${productsText}</td>
+                        <td style="text-align:center">${sale.quantity}</td>
+                        <td style="text-align:right"><strong>${sale.total_amount.toLocaleString()} FCFA</strong></td>
+                        <td style="font-size:0.75rem">${paymentInfo.join('<br>')}</td>
+                        <td style="text-align:center">
+                            <button class="action-btn btn-delete" onclick="deleteSale(${sale.id})" title="Supprimer">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:#95a5a6;padding:2rem">Aucun résultat</td></tr>';
+        }
+
+        function getCurrentDate() {
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        function getCurrentDateISO() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        function formatDateTime(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${day}/${month}/${year} ${hours}:${minutes}`;
+        }
+
+        // INITIALISATION AU CHARGEMENT
+        window.onload = async function() {
+            console.log('🚀 Initialisation ART\'RISE...');
+            const connected = await initSupabase();
+            
+            if (connected) {
+                document.getElementById('connectionStatus').innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> Connexion à la base de données établie
+                    </div>
+                `;
+            } else {
+                document.getElementById('connectionStatus').innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> Mode hors ligne - Les données ne seront pas synchronisées
                     </div>
                 `;
             }
+        };
 
-            grid.innerHTML = html;
-
-            var tbody = document.getElementById('serverPerformanceBody');
-            html = '';
-
-            var sortedServers = Object.keys(serverStats).sort(function(a, b) {
-                return serverStats[b].totalRevenue - serverStats[a].totalRevenue;
-            });
-
-            for (var i = 0; i < sortedServers.length; i++) {
-                var server = sortedServers[i];
-                var stats = serverStats[server];
-                var rank = i + 1;
-
-                html += '<tr>';
-                html += '<td><strong>' + rank + '. ' + server + '</strong></td>';
-                html += '<td style="text-align: center;">' + stats.sales + '</td>';
-                html += '<td style="text-align: center;">' + stats.items + '</td>';
-                html += '<td style="text-align: right;"><strong>' + stats.totalRevenue.toLocaleString('fr-FR') + ' FCFA</strong></td>';
-                html += '<td style="text-align: right;">' + stats.avgSale + ' FCFA</td>';
-                html += '<td style="text-align: center;">';
-                html += '<div style="background: linear-gradient(90deg, #5c6bc0 ' + stats.performance + '%, #ecf0f1 ' + stats.performance + '%); padding: 0.25rem; border-radius: 4px; color: white; font-weight: bold;">';
-                html += stats.performance + '%';
-                html += '</div>';
-                html += '</td>';
-                html += '</tr>';
-            }
-
-            tbody.innerHTML = html;
-        }
-
-        // 📦 Catalogue
-        function openProductCatalog() {
-            renderCatalog();
-            document.getElementById('catalogModal').classList.add('active');
-        }
-
-        function closeCatalogModal() {
-            document.getElementById('catalogModal').classList.remove('active');
-        }
-
-        function renderCatalog() {
-            var html = '';
-            for (var i = 0; i < productCatalog.length; i++) {
-                var prod = productCatalog[i];
-                html += '<div class="checkbox-item" style="justify-content: space-between;">';
-                html += '<div><strong>' + prod.name + '</strong><br><small style="color: #7f8c8d;">' + prod.code + '</small><br><small style="color: #5c6bc0;">' + prod.price.toLocaleString('fr-FR') + ' FCFA</small><br><small style="color: ' + (prod.stock <= prod.alertThreshold ? '#f44336' : '#4caf50') + ';">Stock: ' + prod.stock + '</small></div>';
-                html += '<div>';
-                html += '<button class="action-btn btn-edit" onclick="editProduct(' + i + ')" title="Modifier" style="margin-right: 0.5rem;"><i class="fas fa-edit"></i></button>';
-                html += '<button class="action-btn btn-delete" onclick="deleteProduct(' + i + ')" title="Supprimer"><i class="fas fa-trash"></i></button>';
-                html += '</div>';
-                html += '</div>';
-            }
-            document.getElementById('catalogList').innerHTML = html;
-        }
-
-        function editProduct(index) {
-            var prod = productCatalog[index];
-            var newName = prompt('Modifier le nom du produit :', prod.name);
-            if (newName && newName.trim()) {
-                var newPrice = prompt('Modifier le prix :', prod.price);
-                if (newPrice && !isNaN(newPrice)) {
-                    productCatalog[index].name = newName.trim();
-                    productCatalog[index].price = parseFloat(newPrice);
-                    renderCatalog();
-                }
-            }
-        }
-
-        function deleteProduct(index) {
-            if (confirm('Supprimer ce produit du catalogue ?')) {
-                productCatalog.splice(index, 1);
-                renderCatalog();
-            }
-        }
-
-        function addNewProduct() {
-            document.getElementById('addProductModal').classList.add('active');
-        }
-
-        function closeAddProductModal() {
-            document.getElementById('addProductModal').classList.remove('active');
-            document.getElementById('newProductName').value = '';
-            document.getElementById('newProductCode').value = '';
-            document.getElementById('newProductPrice').value = '';
-            document.getElementById('newProductStock').value = '0';
-            document.getElementById('newProductAlert').value = '10';
-        }
-
-        function saveNewProduct() {
-            var name = document.getElementById('newProductName').value.trim();
-            var code = document.getElementById('newProductCode').value.trim().toLowerCase();
-            var price = parseFloat(document.getElementById('newProductPrice').value) || 1000;
-            var stock = parseInt(document.getElementById('newProductStock').value) || 0;
-            var alertThreshold = parseInt(document.getElementById('newProductAlert').value) || 10;
-
-            if (!name || !code) {
-                alert('Veuillez remplir tous les champs');
-                return;
-            }
-
-            var exists = productCatalog.find(function(p) { return p.code === code; });
-            if (exists) {
-                alert('Ce code produit existe déjà !');
-                return;
-            }
-
-            productCatalog.push({ code: code, name: name, price: price, stock: stock, alertThreshold: alertThreshold });
-            alert('Produit ajouté avec succès !');
-            renderCatalog();
-            closeAddProductModal();
-        }
-
-        // 🧾 Ventes
-        function openAddModal() {
-            editingId = null;
-            productQuantities = {};
-            selectedProductsForSale = [];
-            document.getElementById('modalTitle').textContent = 'Nouvelle Vente';
-            clearSaleForm();
-            document.getElementById('serverName').value = currentUser.name;
-            updateSaleModal();
-            document.getElementById('saleModal').classList.add('active');
-        }
-
-        function closeSaleModal() {
-            document.getElementById('saleModal').classList.remove('active');
-            productQuantities = {};
-            selectedProductsForSale = [];
-            clearSaleForm();
-        }
-
-        function clearSaleForm() {
-            document.getElementById('serverName').value = '';
-            document.getElementById('saleQuantity').value = '0';
-            document.getElementById('saleTotal').value = '0';
-            document.getElementById('paymentOM').value = '0';
-            document.getElementById('paymentMOMO').value = '0';
-            document.getElementById('paymentCASH').value = '0';
-            document.getElementById('productsQuantities').innerHTML = '';
-        }
-
-        function saveSale() {
-            var serverName = document.getElementById('serverName').value.trim();
-            if (!serverName) {
-                alert('Nom de serveuse requis');
-                return;
-            }
-
-            var selectedProducts = [];
-            var stockUpdates = {};
-
-            for (var code in productQuantities) {
-                for (var i = 0; i < productQuantities[code]; i++) {
-                    selectedProducts.push(code);
-                }
-                stockUpdates[code] = productQuantities[code];
-            }
-
-            if (selectedProducts.length === 0) {
-                alert('Veuillez sélectionner au moins un produit');
-                return;
-            }
-
-            for (var code in stockUpdates) {
-                var prod = productCatalog.find(function(p) { return p.code === code; });
-                if (!prod || prod.stock < stockUpdates[code]) {
-                    alert('Stock insuffisant pour ' + prod.name + '! Stock disponible: ' + prod.stock);
-                    return;
-                }
-            }
-
-            var totalAmount = parseFloat(document.getElementById('saleTotal').value) || 0;
-            var paymentOM = parseFloat(document.getElementById('paymentOM').value) || 0;
-            var paymentMOMO = parseFloat(document.getElementById('paymentMOMO').value) || 0;
-            var paymentCASH = parseFloat(document.getElementById('paymentCASH').value) || 0;
-            var totalPayment = paymentOM + paymentMOMO + paymentCASH;
-
-            if (totalPayment !== totalAmount) {
-                alert('Le total des paiements (' + totalPayment.toLocaleString('fr-FR') + ' FCFA) doit être égal au montant total (' + totalAmount.toLocaleString('fr-FR') + ' FCFA)');
-                return;
-            }
-
-            for (var code in stockUpdates) {
-                updateProductStock(code, stockUpdates[code]);
-            }
-
-            var now = new Date();
-            var saleData = {
-                serverName: serverName,
-                serverUsername: currentUser.username,
-                quantity: selectedProducts.length,
-                products: selectedProducts,
-                unitPrice: Math.round(totalAmount / selectedProducts.length),
-                totalAmount: totalAmount,
-                paymentOM: paymentOM,
-                paymentMOMO: paymentMOMO,
-                paymentCASH: paymentCASH,
-                date: getCurrentDate(),
-                time: getCurrentTime(),
-                dateTime: getCurrentDate() + ' ' + getCurrentTime()
-            };
-
-            if (editingId) {
-                var index = sales.findIndex(function(s) { return s.id === editingId; });
-                if (index > -1) {
-                    saleData.id = editingId;
-                    sales[index] = saleData;
-                }
-            } else {
-                var newId = 1;
-                for (var j = 0; j < sales.length; j++) {
-                    if (sales[j].id >= newId) newId = sales[j].id + 1;
-                }
-                saleData.id = newId;
-                sales.push(saleData);
-                lastReceipt = saleData;
-            }
-
-            localStorage.setItem('sales', JSON.stringify(sales));
-
-            renderSales();
-            updateStats();
-            if (currentUser.role === 'server') {
-                updateServerDashboard();
-            }
-            closeSaleModal();
-            checkAlerts();
-
-            if (!editingId && currentUser.role === 'server') {
-                setTimeout(function() {
-                    if (confirm('Voulez-vous imprimer le reçu ?')) {
-                        printReceiptData(saleData);
-                    }
-                }, 500);
-            }
-        }
-
-        function updateSaleModal() {
-            // Fonction pour mettre à jour le modal de vente
-        }
-
-        // 🧾 Reçu
-        function showMySales() {
-            var today = getCurrentDate();
-            var mySalesToday = sales.filter(function(s) {
-                return s.serverUsername === currentUser.username && s.date === today;
-            });
-            renderSales(mySalesToday);
-            alert('Vous avez effectué ' + mySalesToday.length + ' ventes aujourd\'hui.');
-        }
-
-        function printLastReceipt() {
-            if (lastReceipt) {
-                printReceiptData(lastReceipt);
-            } else {
-                alert('Aucune vente récente à imprimer.');
-            }
-        }
-
-        function showMyStats() {
-            var today = getCurrentDate();
-            var mySalesToday = sales.filter(function(s) {
-                return s.serverUsername === currentUser.username && s.date === today;
-            });
-
-            var myRevenue = 0;
-            var myItems = 0;
-
-            for (var i = 0; i < mySalesToday.length; i++) {
-                myRevenue += (mySalesToday[i].totalAmount || (mySalesToday[i].paymentOM + mySalesToday[i].paymentMOMO + mySalesToday[i].paymentCASH));
-                myItems += mySalesToday[i].quantity;
-            }
-
-            alert('Statistiques du jour:\n\n' +
-                  'Ventes: ' + mySalesToday.length + '\n' +
-                  'Chiffre d\'affaires: ' + myRevenue.toLocaleString('fr-FR') + ' FCFA\n' +
-                  'Articles vendus: ' + myItems);
-        }
-
-        // 📊 Exportation
-        function exportToExcel() {
-            var data = [];
-
-            for (var i = 0; i < sales.length; i++) {
-                var s = sales[i];
-                var totalPayment = s.paymentOM + s.paymentMOMO + s.paymentCASH;
-                var productsText = s.products.map(function(p) {
-                    var prod = productCatalog.find(function(pc) { return pc.code === p; });
-                    return prod ? prod.name : p;
-                }).join(', ');
-
-                data.push({
-                    'Date': s.date,
-                    'Heure': s.time || '',
-                    'Serveuse/Vendeuse': s.serverName,
-                    'Quantité': s.quantity,
-                    'Produits Vendus': productsText,
-                    'Prix Unitaire': s.unitPrice,
-                    'Montant Total': s.totalAmount || totalPayment,
-                    'OM': s.paymentOM,
-                    'MOMO': s.paymentMOMO,
-                    'CASH': s.paymentCASH
-                });
-            }
-
-            var ws = XLSX.utils.json_to_sheet(data);
-            var wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Ventes');
-            var filename = 'ventes_';
-            if (currentUser.role === 'server') {
-                filename += currentUser.username + '_';
-            }
-            filename += new Date().toISOString().split('T')[0] + '.xlsx';
-            XLSX.writeFile(wb, filename);
-        }
-
-        function exportReportToExcel(type) {
-            var reportData = generateReport(type);
-            var reportTitle = getReportTitle(type);
-            var reportSales = getReportSales(type);
-
-            var data = [];
-
-            var headers = ['Vendeuse', 'Nombre de Ventes', 'Total Qté', 'Total Montant', 'OM', 'MOMO', 'CASH'];
-
-            var vendeuses = {};
-            for (var i = 0; i < reportSales.length; i++) {
-                var sale = reportSales[i];
-                if (!vendeuses[sale.serverName]) {
-                    vendeuses[sale.serverName] = {
-                        sales: 0,
-                        totalQte: 0,
-                        totalMontant: 0,
-                        om: 0,
-                        momo: 0,
-                        cash: 0
-                    };
-                }
-                vendeuses[sale.serverName].sales++;
-                vendeuses[sale.serverName].totalQte += sale.quantity;
-                vendeuses[sale.serverName].totalMontant += (sale.totalAmount || (sale.paymentOM + sale.paymentMOMO + sale.paymentCASH));
-                vendeuses[sale.serverName].om += sale.paymentOM;
-                vendeuses[sale.serverName].momo += sale.paymentMOMO;
-                vendeuses[sale.serverName].cash += sale.paymentCASH;
-            }
-
-            for (var vendeuse in vendeuses) {
-                var data = vendeuses[vendeuse];
-                data.push({
-                    'Vendeuse': vendeuse,
-                    'Nombre de Ventes': data.sales,
-                    'Total Qté': data.totalQte,
-                    'Total Montant': data.totalMontant,
-                    'OM': data.om,
-                    'MOMO': data.momo,
-                    'CASH': data.cash
-                });
-            }
-
-            var totalRow = {
-                'Vendeuse': 'TOTAL',
-                'Nombre de Ventes': reportData.totalSales,
-                'Total Qté': reportSales.reduce((sum, sale) => sum + sale.quantity, 0),
-                'Total Montant': reportData.totalAmount,
-                'OM': reportData.totalOM,
-                'MOMO': reportData.totalMOMO,
-                'CASH': reportData.totalCASH
-            };
-            data.push(totalRow);
-
-            var ws = XLSX.utils.json_to_sheet(data);
-            var wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Rapport ' + reportTitle);
-
-            ws['!pageSetup'] = {
-                paperSize: 9,
-                orientation: 'landscape',
-                fitToWidth: 1,
-                fitToHeight: 0
-            };
-
-            var filename = 'rapport_' + type + '_' + new Date().toISOString().split('T')[0] + '.xlsx';
-            XLSX.writeFile(wb, filename);
-        }
-
-        // 🔄 Réinitialisation
-        function resetAllData() {
-            if (confirm('Êtes-vous sûr de vouloir tout réinitialiser ? Cela supprimera toutes les ventes et remettra les compteurs à zéro.')) {
-                sales = [];
-                cashFund = 0;
-                expenses = [];
-                localStorage.removeItem('cashFund');
-                localStorage.removeItem('sales');
-                localStorage.removeItem('expenses');
-                localStorage.removeItem('productStock');
-                localStorage.removeItem('stockMovements');
-
-                productCatalog.forEach(function(prod) {
-                    prod.stock = 50;
-                    prod.alertThreshold = 10;
-                });
-
-                stockMovements = [];
-
-                renderSales();
-                updateStats();
-                updateCashFundDisplay();
-                loadExpenses();
-                alert('Toutes les données ont été réinitialisées.');
-            }
-        }
-
-        // 🔔 Alertes
-        function checkAlerts() {
-            alerts = [];
-
-            for (var i = 0; i < sales.length; i++) {
-                var s = sales[i];
-                var totalPayment = s.paymentOM + s.paymentMOMO + s.paymentCASH;
-                var expectedAmount = s.totalAmount || totalPayment;
-
-                if (totalPayment !== expectedAmount) {
-                    alerts.push({
-                        type: 'warning',
-                        message: 'Montant incorrect pour la vente de ' + s.serverName
-                    });
-                }
-
-                if (s.quantity < 0 || s.unitPrice < 0 || s.paymentOM < 0 || s.paymentMOMO < 0 || s.paymentCASH < 0) {
-                    alerts.push({
-                        type: 'danger',
-                        message: 'Valeur négative détectée dans la vente de ' + s.serverName
-                    });
-                }
-            }
-
-            if (currentUser && currentUser.role === 'cashier' && cashFund === 0) {
-                alerts.push({
-                    type: 'danger',
-                    message: 'Fonds de caisse non configuré !'
-                });
-            }
-
-            checkStockAlerts();
-            renderAlerts();
-        }
-
-        function renderAlerts() {
-            var container = document.getElementById('alertsContainer');
-            if (alerts.length === 0) {
-                container.innerHTML = '';
-                return;
-            }
-
-            var html = '';
-            for (var i = 0; i < alerts.length; i++) {
-                var alert = alerts[i];
-                html += '<div class="alert alert-' + alert.type + '">';
-                html += '<i class="fas fa-exclamation-triangle"></i> ' + alert.message;
-                html += '</div>';
-            }
-            container.innerHTML = html;
-        }
-
-        // 🧭 Modales
+        // Fermer les modales en cliquant à l'extérieur
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
                 event.target.classList.remove('active');
             }
-        };
-
-        // 🚀 Initialisation
-        window.onload = function() {
-            console.log("Application ART'RISE - Système de Gestion de Stock");
-            console.log("Statut: En ligne");
-            console.log("Toutes les fonctionnalités sont activées");
         };
     </script>
 </body>
